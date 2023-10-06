@@ -1,0 +1,16 @@
+{
+  "domain": "patch",
+  "name": "Patch",
+  "codeowners": [
+    "@amitfin"
+  ],
+  "documentation": "https://github.com/amitfin/patch",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/amitfin/patch/issues",
+  "quality_scale": "platinum",
+  "requirements": [
+    "aiofiles"
+  ],
+  "version": "1.0.0"
+}
