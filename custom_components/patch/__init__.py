@@ -107,18 +107,18 @@ class Patch:
             destination_content = await file.read()
         async with aiofiles.open(patch) as file:
             patch_content = await file.read()
-        if destination_content != base_content:
-            LOGGER.warning(
-                "Destination file '%s' is different than it's base '%s'.",
-                destination,
-                base,
-            )
-            return False
         if destination_content == patch_content:
             LOGGER.debug(
                 "Destination file '%s' is identical to the patch file '%s'.",
                 destination,
                 patch,
+            )
+            return False
+        if destination_content != base_content:
+            LOGGER.warning(
+                "Destination file '%s' is different than it's base '%s'.",
+                destination,
+                base,
             )
             return False
         async with aiofiles.open(destination, "w") as file:
