@@ -115,7 +115,7 @@ class Patch:
             )
             return False
         if destination_content != base_content:
-            LOGGER.warning(
+            LOGGER.error(
                 "Destination file '%s' is different than it's base '%s'.",
                 destination,
                 base,
