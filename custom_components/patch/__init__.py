@@ -10,9 +10,9 @@ import aiofiles.os
 
 from homeassistant import config as config_utils
 from homeassistant.const import (
+    CONF_BASE,
     CONF_DELAY,
     CONF_NAME,
-    CONF_SOURCE,
     SERVICE_HOMEASSISTANT_RESTART,
     SERVICE_RELOAD,
 )
@@ -23,7 +23,14 @@ from homeassistant.helpers import event
 from homeassistant.helpers.typing import ConfigType
 import homeassistant.util.dt as dt_util
 
-from .const import CONF_DESTINATION, CONF_FILES, DEFAULT_DELAY_SECONDS, DOMAIN, LOGGER
+from .const import (
+    CONF_DESTINATION,
+    CONF_FILES,
+    CONF_PATCH,
+    DEFAULT_DELAY_SECONDS,
+    DOMAIN,
+    LOGGER,
+)
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -68,7 +75,10 @@ class Patch:
         update = False
         for file in self._config.get(CONF_FILES, []):
             if await self._patch(
-                file[CONF_NAME], file[CONF_SOURCE], file[CONF_DESTINATION]
+                file[CONF_NAME],
+                file[CONF_BASE],
+                file[CONF_DESTINATION],
+                file[CONF_PATCH],
             ):
                 update = True
         if update:
@@ -78,26 +88,44 @@ class Patch:
             )
 
     async def _patch(
-        self, name: str, source_directory: str, destination_directory: str
+        self,
+        name: str,
+        base_directory: str,
+        destination_directory: str,
+        patch_directory: str,
     ) -> bool:
         """Check if identical files and update the destination if needed."""
-        source = os.path.join(source_directory, name)
+        base = os.path.join(base_directory, name)
         destination = os.path.join(destination_directory, name)
-        for file in (source, destination):
+        patch = os.path.join(patch_directory, name)
+        for file in (base, destination, patch):
             if not await aiofiles.os.path.isfile(file):
                 raise FileNotFoundError(f"{file} doesn't exist")
-        async with aiofiles.open(source) as file:
-            source_content = await file.read()
+        async with aiofiles.open(base) as file:
+            base_content = await file.read()
         async with aiofiles.open(destination) as file:
             destination_content = await file.read()
-        if source_content == destination_content:
+        async with aiofiles.open(patch) as file:
+            patch_content = await file.read()
+        if destination_content != base_content:
+            LOGGER.warning(
+                "Destination file '%s' is different than it's base '%s'.",
+                destination,
+                base,
+            )
+            return False
+        if destination_content == patch_content:
+            LOGGER.debug(
+                "Destination file '%s' is identical to the patch file '%s'.",
+                destination,
+                patch,
+            )
             return False
         async with aiofiles.open(destination, "w") as file:
-            await file.write(source_content)
+            await file.write(patch_content)
         LOGGER.warning(
-            "'%s' was patched: from '%s' to '%s'",
-            name,
-            source_directory,
-            destination_directory,
+            "Destination file '%s' was updated by the patch file '%s'.",
+            destination,
+            patch,
         )
         return True

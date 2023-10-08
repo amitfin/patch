@@ -12,9 +12,9 @@ import pytest
 from freezegun.api import FrozenDateTimeFactory
 
 from homeassistant.const import (
+    CONF_BASE,
     CONF_DELAY,
     CONF_NAME,
-    CONF_SOURCE,
     SERVICE_HOMEASSISTANT_RESTART,
     SERVICE_RELOAD,
 )
@@ -29,6 +29,7 @@ from pytest_homeassistant_custom_component.common import async_fire_time_changed
 from custom_components.patch.const import (
     CONF_DESTINATION,
     CONF_FILES,
+    CONF_PATCH,
     DEFAULT_DELAY_SECONDS,
     DOMAIN,
 )
@@ -86,40 +87,57 @@ async def test_delay(
 
 @patch("homeassistant.core.ServiceRegistry.async_call")
 @pytest.mark.parametrize(
-    ["source_content", "destination_content", "restart"],
-    [("old", "new", True), ("abc", "abc", False)],
-    ids=["update", "identical"],
+    ["base_content", "destination_content", "patch_content", "restart"],
+    [
+        ("old", "old", "new", True),
+        ("abc", "abc", "abc", False),
+        ("abc", "def", "ghi", False),
+    ],
+    ids=["update", "identical", "different base"],
 )
 async def test_patch(
     async_call_mock: AsyncMock,
     hass: HomeAssistant,
     freezer: FrozenDateTimeFactory,
-    source_content: str,
+    base_content: str,
     destination_content: str,
+    patch_content: str,
     restart: bool,
 ) -> None:
     """Test updating a file."""
-    with tempfile.TemporaryDirectory() as source:
+    with tempfile.TemporaryDirectory() as base:
         with tempfile.TemporaryDirectory() as destination:
-            with open(os.path.join(source, "file"), "w", encoding="ascii") as file:
-                file.write(source_content)
-            with open(os.path.join(destination, "file"), "w", encoding="ascii") as file:
-                file.write(destination_content)
-            await async_setup(
-                hass,
-                {
-                    CONF_FILES: [
-                        {
-                            CONF_NAME: "file",
-                            CONF_SOURCE: source,
-                            CONF_DESTINATION: destination,
-                        }
-                    ]
-                },
-            )
-            await async_next_day(hass, freezer)
-            with open(os.path.join(destination, "file"), encoding="ascii") as file:
-                assert file.read() == source_content
+            with tempfile.TemporaryDirectory() as patch_dir:
+                with open(os.path.join(base, "file"), "w", encoding="ascii") as file:
+                    file.write(base_content)
+                with open(
+                    os.path.join(destination, "file"), "w", encoding="ascii"
+                ) as file:
+                    file.write(destination_content)
+                with open(
+                    os.path.join(patch_dir, "file"), "w", encoding="ascii"
+                ) as file:
+                    file.write(patch_content)
+                await async_setup(
+                    hass,
+                    {
+                        CONF_FILES: [
+                            {
+                                CONF_NAME: "file",
+                                CONF_BASE: base,
+                                CONF_DESTINATION: destination,
+                                CONF_PATCH: patch_dir,
+                            }
+                        ]
+                    },
+                )
+                await async_next_day(hass, freezer)
+                with open(os.path.join(destination, "file"), encoding="ascii") as file:
+                    assert file.read() == (
+                        patch_content
+                        if base_content == destination_content
+                        else destination_content
+                    )
     assert async_call_mock.call_count == (1 if restart else 0)
     if restart:
         assert async_call_mock.await_args_list[0].args[0] == ha.DOMAIN
@@ -149,30 +167,40 @@ async def test_reload(
         vol.Schema({}),
     )
 
-    with tempfile.TemporaryDirectory() as source:
+    with tempfile.TemporaryDirectory() as base:
         with tempfile.TemporaryDirectory() as destination:
-            with open(os.path.join(source, "file"), "w", encoding="ascii") as file:
-                file.write("123")
-            with open(os.path.join(destination, "file"), "w", encoding="ascii") as file:
-                file.write("456")
-            with patch(
-                "homeassistant.config.load_yaml_config_file",
-                return_value={
-                    DOMAIN: {
-                        CONF_FILES: [
-                            {
-                                CONF_NAME: "file",
-                                CONF_SOURCE: source,
-                                CONF_DESTINATION: destination,
-                            }
-                        ]
-                    }
-                },
-            ):
-                await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
-                await hass.async_block_till_done()
-            with open(os.path.join(destination, "file"), encoding="ascii") as file:
-                assert file.read() == "123"
+            with tempfile.TemporaryDirectory() as patch_dir:
+                with open(os.path.join(base, "file"), "w", encoding="ascii") as file:
+                    file.write("123")
+                with open(
+                    os.path.join(destination, "file"), "w", encoding="ascii"
+                ) as file:
+                    file.write("123")
+                with open(
+                    os.path.join(patch_dir, "file"), "w", encoding="ascii"
+                ) as file:
+                    file.write("456")
+                with patch(
+                    "homeassistant.config.load_yaml_config_file",
+                    return_value={
+                        DOMAIN: {
+                            CONF_FILES: [
+                                {
+                                    CONF_NAME: "file",
+                                    CONF_BASE: base,
+                                    CONF_DESTINATION: destination,
+                                    CONF_PATCH: patch_dir,
+                                }
+                            ]
+                        }
+                    },
+                ):
+                    await hass.services.async_call(
+                        DOMAIN, SERVICE_RELOAD, blocking=True
+                    )
+                    await hass.async_block_till_done()
+                with open(os.path.join(destination, "file"), encoding="ascii") as file:
+                    assert file.read() == "456"
     assert len(core_reload_calls) == 1
 
 
@@ -205,8 +233,9 @@ async def test_no_file(
                 CONF_FILES: [
                     {
                         CONF_NAME: "file",
-                        CONF_SOURCE: "dummy_source",
+                        CONF_BASE: "dummy_base",
                         CONF_DESTINATION: "dummy_destination",
+                        CONF_PATCH: "dummy_patch",
                     }
                 ]
             }
