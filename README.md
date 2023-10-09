@@ -9,9 +9,9 @@
 ![Project Maintenance](https://img.shields.io/badge/maintainer-Amit%20Finkelstein-blue.svg?style=for-the-badge)
 
 ## Patch Home Assistant core files
-***Note: This is an advanced and dangerous integration. If you are not a programmer, you probably don’t want to play with it.***
+***Note: This is an advanced integration. If you are not a programmer, you probably don’t want to play with it.***
 
-There are cases when a code change is slow to happen. For example, integrations have often dependency libraries which are maintained by a single person or a very small set of people. The pace of a change (e.g. code review, releasing a new version, etc') can take weeks. The integration mitigates this challenge by allowing a short-term patch of the system. In addition, the patch will get re-applied after a Home Assistant update which brings a fresh container (overriding all patches).
+There are cases when a code change is slow to happen. For example, integrations have often dependency libraries which are maintained by a single person or a very small set of people. The pace of a change (e.g. code review, releasing a new version, etc') can take weeks. This integration mitigates such situations by allowing a short-term patch of the system. In addition, the patch will get re-applied after a Home Assistant update which brings a fresh container (overriding all patches).
 
 ## Configuration
 `configuration.yaml` should be used (there is no UI on purpose). Here is an example:
