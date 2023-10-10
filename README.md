@@ -8,7 +8,7 @@
 
 ![Project Maintenance](https://img.shields.io/badge/maintainer-Amit%20Finkelstein-blue.svg?style=for-the-badge)
 
-## Patch Home Assistant core files
+## Patch Home Assistant Core files
 ***Note: This is an advanced integration. If you are not a programmer, you probably don’t want to play with it.***
 
 There are cases when a code change is slow to happen. For example, integrations have often dependency libraries which are maintained by a single person or a very small set of people. The pace of a change (e.g. code review, releasing a new version, etc') can take weeks. This integration mitigates such situations by allowing a short-term patch of the system. In addition, the patch will get re-applied after a Home Assistant update which brings a fresh container (overriding all patches).
@@ -29,7 +29,7 @@ patch:
 
 `delay` is an optional parameter, with a default of 300 seconds (5 minutes). This is the delay between the startup time of the integration and when it applies the patches.
 
-If a patch was applied (to one file or more) the integration initiates a restart of Home Assistant (core). This should happen only once since the next time (after the restart) there should be no further patches.
+If a patch was applied (to one file or more) the integration initiates a restart of Home Assistant (Core). This should happen only once since the next time (after the restart) there should be no further patches.
 
 `files` is a list of patches to apply. It has the following properties (all are mandatory):
 - `name`: the file name
@@ -37,7 +37,7 @@ If a patch was applied (to one file or more) the integration initiates a restart
 - `destination`: the local directory with the file to be patched.
 - `patch`: the directory containing the file with the change.
 
-All files must exist (e.g. `base/name`, etc') inside the Home Assistant core environment. It’s convenient to mount `base` and `patch` directories as [network shares](https://www.home-assistant.io/common-tasks/os#network-storage).
+All files must exist (e.g. `base/name`, etc') inside the Home Assistant Core environment. It’s convenient to mount `base` and `patch` directories as [network shares](https://www.home-assistant.io/common-tasks/os#network-storage).
 
 ## Install
 HACS is the preferred and easier way to install the component, and can be done by using this My button:
@@ -49,13 +49,13 @@ Otherwise, download `patch.zip` from the [latest release](https://github.com/ami
 Home Assistant restart is required once the integration files are copied (either by HACS or manually). After the restart, the `configuration.yaml` should be edited and the `patch` section should be created. An additional restart is required after that for the integration to be loaded.
 
 ## File System structure
-Home Assistant can run in different configuration. A common one is Home Assistant Operating System, which will be used in the explaination below. In this configuration Home Assistant Core runs as a container. The 2 most relevant directories are:
-1)	`/usr/src/homeassistant`: this is the place with Home Assistant files built from the [core repository]( https://github.com/home-assistant/core).
+Home Assistant can run in different configurations. A common one is Home Assistant Operating System, which will be used in the explaination below. In this configuration Home Assistant Core runs as a container. The 2 most relevant directories are:
+1)	`/usr/src/homeassistant`: this is the place with Home Assistant files built from the [Core repository]( https://github.com/home-assistant/core).
 2)	`/usr/local/lib/python3.11/site-packages`: this is the place where Python libraries are installed. (Note: `python3.11` will be changed when Home Assistatnt upgrades its Python version.)
 
 It’s possible to explore the environment along with the file system structure and content by:
 1)	SSH-ing into the host. Instructions are [here](https://developers.home-assistant.io/docs/operating-system/debugging/).
-2)	In the SSH session switch into Home Assistant core’s container via the command: `docker exec -it homeassistant /bin/bash`
+2)	In the SSH session switch into Home Assistant Core’s container via the command: `docker exec -it homeassistant /bin/bash`
 
 ## Reload
 The integration also exposes a `reload` custom service. The delay parameter is ignored in this case and the logic is executed immediately, including Home Assistant restart, when needed.
