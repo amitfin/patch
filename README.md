@@ -39,6 +39,15 @@ If a patch was applied (to one file or more) the integration initiates a restart
 
 All files must exist (e.g. `base/name`, etc') inside the Home Assistant core environment. It’s convenient to mount `base` and `patch` directories as [network shares](https://www.home-assistant.io/common-tasks/os#network-storage).
 
+## Install
+HACS is the preferred and easier way to install the component, and can be done by using this My button:
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=amitfin&repository=patch&category=integration)
+
+Otherwise, download `patch.zip` from the [latest release](https://github.com/amitfin/patch/releases), extract and copy the content under `custom_components` directory.
+
+Home Assistant restart is required once the integration files are copied (either by HACS or manually). After the restart, the `configuration.yaml` should be edited and the `patch` section should be created. An additional restart is required after that for the integration to be loaded.
+
 ## File System structure
 Home Assistant can run in different configuration. A common one is Home Assistant Operating System, which will be used in the explaination below. In this configuration Home Assistant Core runs as a container. The 2 most relevant directories are:
 1)	`/usr/src/homeassistant`: this is the place with Home Assistant files built from the [core repository]( https://github.com/home-assistant/core).
