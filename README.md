@@ -13,6 +13,8 @@
 
 There are cases when a code change is slow to happen. For example, integrations have often dependency libraries which are maintained by a single person or a very small set of people. The pace of a change (e.g. code review, releasing a new version, etc') can take weeks. This integration mitigates such situations by allowing a short-term patch of the system. In addition, the patch will get re-applied after a Home Assistant update which brings a fresh container (overriding all patches).
 
+_Note: When the change is inside an integration code, it's possible to override the entire integration using the instrcutions [here](https://developers.home-assistant.io/docs/development_tips/#test-core-integration-changes-in-your-production-home-assistant-environment). This is a better way for such situation. However, when the change is inside a dependency library, it's not straightforward to use the method above. This is a scenario where this integration can come handy._
+
 ## Configuration
 `configuration.yaml` should be used (there is no UI on purpose). Here is an example:
 ```
