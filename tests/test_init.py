@@ -90,7 +90,7 @@ async def test_delay(
     ["base_content", "destination_content", "patch_content", "restart"],
     [
         ("old", "old", "new", True),
-        ("abc", "abc", "abc", False),
+        ("def", "abc", "abc", False),
         ("abc", "def", "ghi", False),
     ],
     ids=["update", "identical", "different base"],
@@ -99,6 +99,7 @@ async def test_patch(
     async_call_mock: AsyncMock,
     hass: HomeAssistant,
     freezer: FrozenDateTimeFactory,
+    caplog: pytest.LogCaptureFixture,
     base_content: str,
     destination_content: str,
     patch_content: str,
@@ -144,6 +145,11 @@ async def test_patch(
         assert (
             async_call_mock.await_args_list[0].args[1] == SERVICE_HOMEASSISTANT_RESTART
         )
+        assert "was updated by the patch file" in caplog.text
+    elif destination_content == patch_content:
+        assert "is identical to the patch file" in caplog.text
+    else:
+        assert "is different than it's base" in caplog.text
 
 
 async def test_reload(
