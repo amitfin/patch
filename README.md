@@ -31,7 +31,7 @@ patch:
 
 If a patch was applied (to one file or more) the integration initiates a restart of Home Assistant (Core). This should happen only once since the next time (after the restart) there should be no further patches.
 
-`files` is a list of patches to apply. It has the following properties (all are mandatory):
+`files` is a list of patches to apply. Each item on the list has the following properties (all are mandatory):
 - `name`: the file name
 - `base`: the directory containing an original copy of the file (before the patch). The patch happens only if the content of the file to be patched is identical to the base file.
 - `destination`: the local directory with the file to be patched.
