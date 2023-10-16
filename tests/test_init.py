@@ -220,9 +220,8 @@ async def test_reload_no_config(
     with patch(
         "homeassistant.config.load_yaml_config_file",
         return_value={},
-    ):
-        with pytest.raises(IntegrationError):
-            await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
+    ), pytest.raises(IntegrationError):
+        await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
 
 
 @pytest.mark.parametrize(
@@ -259,9 +258,8 @@ async def test_invalid_config(
                 ]
             }
         },
-    ):
-        with pytest.raises(vol.error.MultipleInvalid) as err:
-            await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
+    ), pytest.raises(vol.error.MultipleInvalid) as err:
+        await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
     assert error in str(err.value)
 
 
