@@ -19,7 +19,7 @@ from homeassistant.const import (
 import homeassistant.core as ha
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import IntegrationError
-from homeassistant.helpers import event
+from homeassistant.helpers import config_validation as cv, event
 from homeassistant.helpers.typing import ConfigType
 import homeassistant.util.dt as dt_util
 
@@ -30,6 +30,40 @@ from .const import (
     DEFAULT_DELAY_SECONDS,
     DOMAIN,
     LOGGER,
+)
+
+CONFIG_FILE_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_NAME): cv.string,
+        vol.Required(CONF_BASE): cv.isdir,
+        vol.Required(CONF_DESTINATION): cv.isdir,
+        vol.Required(CONF_PATCH): cv.isdir,
+    },
+    extra=vol.ALLOW_EXTRA,
+)
+
+
+def validate_files(single_patch: dict[str, str]) -> dict[str, str]:
+    """Validate all files of a patch configuration."""
+    for dir_property in (CONF_BASE, CONF_DESTINATION, CONF_PATCH):
+        cv.isfile(os.path.join(single_patch[dir_property], single_patch[CONF_NAME]))
+    return single_patch
+
+
+CONFIG_SCHEMA = vol.Schema(
+    {
+        DOMAIN: vol.Schema(
+            {
+                vol.Optional(CONF_DELAY): vol.All(
+                    vol.Coerce(int), vol.Range(min=0, min_included=True)
+                ),
+                vol.Optional(CONF_FILES): vol.All(
+                    cv.ensure_list, [CONFIG_FILE_SCHEMA], [validate_files]
+                ),
+            }
+        )
+    },
+    extra=vol.ALLOW_EXTRA,
 )
 
 
@@ -45,6 +79,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             raise IntegrationError(
                 f"'{DOMAIN}' section was not found in {config_utils.YAML_CONFIG_FILE}"
             )
+        CONFIG_SCHEMA({DOMAIN: config[DOMAIN]})
         await Patch(hass, config[DOMAIN]).run()
 
     hass.services.async_register(DOMAIN, SERVICE_RELOAD, async_reload, vol.Schema({}))
@@ -98,9 +133,6 @@ class Patch:
         base = os.path.join(base_directory, name)
         destination = os.path.join(destination_directory, name)
         patch = os.path.join(patch_directory, name)
-        for file in (base, destination, patch):
-            if not await aiofiles.os.path.isfile(file):
-                raise FileNotFoundError(f"{file} doesn't exist")
         async with aiofiles.open(base) as file:
             base_content = await file.read()
         async with aiofiles.open(destination) as file:

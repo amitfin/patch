@@ -39,8 +39,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType | None = None) -> 
     """Load patch custom integration."""
     assert await async_setup_component(
         hass,
-        "patch",
-        {"patch": config or {}},
+        DOMAIN,
+        {DOMAIN: config or {}},
     )
     await hass.async_block_till_done()
 
@@ -225,9 +225,22 @@ async def test_reload_no_config(
             await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
 
 
-async def test_no_file(
+@pytest.mark.parametrize(
+    ("name", "base", "destination", "patch_dir", "error"),
+    (
+        ("test", ".", ".", ".", "not a file"),
+        ("test", "dummy", ".", ".", "not a directory"),
+    ),
+    ids=["no file", "no directory"],
+)
+async def test_invalid_config(
     hass: HomeAssistant,
     freezer: FrozenDateTimeFactory,
+    name: str,
+    base: str,
+    destination: str,
+    patch_dir: str,
+    error: str,
 ) -> None:
     """Test file doesn't exist."""
     await async_setup(hass)
@@ -238,14 +251,33 @@ async def test_no_file(
             DOMAIN: {
                 CONF_FILES: [
                     {
-                        CONF_NAME: "file",
-                        CONF_BASE: "dummy_base",
-                        CONF_DESTINATION: "dummy_destination",
-                        CONF_PATCH: "dummy_patch",
+                        CONF_NAME: name,
+                        CONF_BASE: base,
+                        CONF_DESTINATION: destination,
+                        CONF_PATCH: patch_dir,
                     }
                 ]
             }
         },
     ):
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises(vol.error.MultipleInvalid) as err:
             await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
+    assert error in str(err.value)
+
+
+async def test_no_delay(
+    hass: HomeAssistant,
+) -> None:
+    """Test no delay."""
+    await async_setup(hass, {CONF_DELAY: 0})
+
+
+async def test_negative_delay(
+    hass: HomeAssistant,
+) -> None:
+    """Test negative delay."""
+    assert not await async_setup_component(
+        hass,
+        DOMAIN,
+        {DOMAIN: {CONF_DELAY: -1}},
+    )
