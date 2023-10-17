@@ -33,7 +33,7 @@ If a patch was applied (to one file or more) the integration initiates a restart
 
 `files` is a list of patches to apply. Each item on the list has the following properties (all are mandatory):
 - `name`: the file name
-- `base`: the directory containing an original copy of the file (before the patch). The patch happens only if the content of the file to be patched is identical to the base file.
+- `base`: the directory containing an original copy of the file (before the patch). The patch happens only if the content of the file to be patched (`destination/name`) is identical to the content of the base file (`base/name`). Otherwise, a repair issue is raised. In such a case, a rebase of the patch is required along with updating the content of the files `base/name` and `patch/name`.
 - `destination`: the local directory with the file to be patched.
 - `patch`: the directory containing the file with the change.
 
