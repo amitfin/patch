@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime
+from enum import StrEnum
 import os
 import voluptuous as vol
 
@@ -19,7 +20,7 @@ from homeassistant.const import (
 import homeassistant.core as ha
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import IntegrationError
-from homeassistant.helpers import config_validation as cv, event
+from homeassistant.helpers import config_validation as cv, event, issue_registry as ir
 from homeassistant.helpers.typing import ConfigType
 import homeassistant.util.dt as dt_util
 
@@ -67,6 +68,14 @@ CONFIG_SCHEMA = vol.Schema(
 )
 
 
+class PatchResult(StrEnum):
+    """Patch result types."""
+
+    UPDATED = "updated"
+    IDENTICAL = "identical"
+    BASE_MISMATCH = "base_mismatch"
+
+
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up domain."""
 
@@ -79,8 +88,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             raise IntegrationError(
                 f"'{DOMAIN}' section was not found in {config_utils.YAML_CONFIG_FILE}"
             )
-        CONFIG_SCHEMA({DOMAIN: config[DOMAIN]})
-        await Patch(hass, config[DOMAIN]).run()
+        await Patch(hass, CONFIG_SCHEMA({DOMAIN: config[DOMAIN]})[DOMAIN]).run()
 
     hass.services.async_register(DOMAIN, SERVICE_RELOAD, async_reload, vol.Schema({}))
 
@@ -108,14 +116,21 @@ class Patch:
     async def run(self, *_) -> None:
         """Execute."""
         update = False
+        base_mismatch = []
         for file in self._config.get(CONF_FILES, []):
-            if await self._patch(
+            result = await self._patch(
                 file[CONF_NAME],
                 file[CONF_BASE],
                 file[CONF_DESTINATION],
                 file[CONF_PATCH],
-            ):
-                update = True
+            )
+            match result:
+                case PatchResult.UPDATED:
+                    update = True
+                case PatchResult.BASE_MISMATCH:
+                    base_mismatch.append(file)
+        if base_mismatch:
+            self._repair(base_mismatch)
         if update:
             LOGGER.warning("Core file(s) were patched. Restarting HA core.")
             await self._hass.services.async_call(
@@ -128,7 +143,7 @@ class Patch:
         base_directory: str,
         destination_directory: str,
         patch_directory: str,
-    ) -> bool:
+    ) -> PatchResult:
         """Check if identical files and update the destination if needed."""
         base = os.path.join(base_directory, name)
         destination = os.path.join(destination_directory, name)
@@ -145,14 +160,14 @@ class Patch:
                 destination,
                 patch,
             )
-            return False
+            return PatchResult.IDENTICAL
         if destination_content != base_content:
             LOGGER.error(
-                "Destination file '%s' is different than it's base '%s'.",
+                "Destination file '%s' is different than its base '%s'.",
                 destination,
                 base,
             )
-            return False
+            return PatchResult.BASE_MISMATCH
         async with aiofiles.open(destination, "w") as file:
             await file.write(patch_content)
         LOGGER.warning(
@@ -160,4 +175,25 @@ class Patch:
             destination,
             patch,
         )
-        return True
+        return PatchResult.UPDATED
+
+    def _repair(self, files: list[dict[str, str]]) -> None:
+        """Report an issue of base file mismatch."""
+        file_names = ", ".join(f'"{ file[CONF_NAME] }"' for file in files)
+        message = (
+            f"The file {file_names} is"
+            if len(files) == 1
+            else f"The files {file_names} are"
+        )
+        ir.async_create_issue(
+            self._hass,
+            DOMAIN,
+            "patch_file_base_mismatch_" + str(int(dt_util.now().timestamp())),
+            is_fixable=False,
+            learn_more_url="https://github.com/amitfin/patch#configuration",
+            severity=ir.IssueSeverity.WARNING,
+            translation_key="base_mismatch",
+            translation_placeholders={
+                "files": message,
+            },
+        )

@@ -1,0 +1,8 @@
+{
+    "issues": {
+        "base_mismatch": {
+            "title": "Patch Base File Mismatch",
+            "description": "{files} different than the corresponding base file. To fix this issue rebase the patch, and update the base and patch files."
+        }
+    }
+}

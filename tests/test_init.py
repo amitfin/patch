@@ -21,10 +21,14 @@ from homeassistant.const import (
 import homeassistant.core as ha
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import IntegrationError
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.setup import async_setup_component
 import homeassistant.util.dt as dt_util
-from pytest_homeassistant_custom_component.common import async_fire_time_changed
+from pytest_homeassistant_custom_component.common import (
+    async_capture_events,
+    async_fire_time_changed,
+)
 
 from custom_components.patch.const import (
     CONF_DESTINATION,
@@ -106,6 +110,7 @@ async def test_patch(
     restart: bool,
 ) -> None:
     """Test updating a file."""
+    repairs = async_capture_events(hass, ir.EVENT_REPAIRS_ISSUE_REGISTRY_UPDATED)
     with (
         tempfile.TemporaryDirectory() as base,
         tempfile.TemporaryDirectory() as destination,
@@ -138,6 +143,9 @@ async def test_patch(
                 else destination_content
             )
     assert async_call_mock.call_count == (1 if restart else 0)
+    assert len(repairs) == (
+        1 if not restart and destination_content != patch_content else 0
+    )
     if restart:
         assert async_call_mock.await_args_list[0].args[0] == ha.DOMAIN
         assert (
@@ -147,7 +155,10 @@ async def test_patch(
     elif destination_content == patch_content:
         assert "is identical to the patch file" in caplog.text
     else:
-        assert "is different than it's base" in caplog.text
+        assert "is different than its base" in caplog.text
+        assert repairs[0].data["action"] == "create"
+        assert repairs[0].data["domain"] == DOMAIN
+        assert repairs[0].data["issue_id"].startswith("patch_file_base_mismatch")
 
 
 async def test_reload(

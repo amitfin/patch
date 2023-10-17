@@ -1,0 +1,6 @@
+delay: 0
+files:
+  - name: 1.txt
+    base: /workspaces/patch/config/patch/base
+    destination: /workspaces/patch/config/patch/destination
+    patch: /workspaces/patch/config/patch/patch
