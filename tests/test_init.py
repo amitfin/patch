@@ -11,11 +11,11 @@ import voluptuous as vol
 import pytest
 from freezegun.api import FrozenDateTimeFactory
 
+from homeassistant.components.homeassistant import SERVICE_HOMEASSISTANT_RESTART
 from homeassistant.const import (
     CONF_BASE,
     CONF_DELAY,
     CONF_NAME,
-    SERVICE_HOMEASSISTANT_RESTART,
     SERVICE_RELOAD,
 )
 import homeassistant.core as ha
