@@ -1,0 +1,15 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "homeassistant",
+    "hass",
+    "HACS",
+    "codeowners",
+    "amitfin",
+    "pytest",
+    "venv",
+    "autouse",
+    "freezegun"
+  ]
+}
