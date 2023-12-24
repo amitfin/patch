@@ -4,12 +4,14 @@ from __future__ import annotations
 import datetime
 from enum import StrEnum
 import os
+import sys
+
 import voluptuous as vol
 
 import aiofiles
 import aiofiles.os
 
-from homeassistant import config as config_utils
+import homeassistant
 from homeassistant.components.homeassistant import SERVICE_HOMEASSISTANT_RESTART
 from homeassistant.const import (
     CONF_BASE,
@@ -33,12 +35,23 @@ from .const import (
     LOGGER,
 )
 
+PATH_VARIABLES = {
+    "site-packages": next(filter(lambda x: x.endswith("site-packages"), sys.path)),
+    "homeassistant": os.path.dirname(homeassistant.__file__),
+}
+
+
+def expand_path(path: str) -> str:
+    """Expand variables in path string."""
+    return path.format(**PATH_VARIABLES)
+
+
 CONFIG_FILE_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_NAME): cv.string,
-        vol.Required(CONF_BASE): cv.isdir,
-        vol.Required(CONF_DESTINATION): cv.isdir,
-        vol.Required(CONF_PATCH): cv.isdir,
+        vol.Required(CONF_BASE): vol.All(cv.string, expand_path, cv.isdir),
+        vol.Required(CONF_DESTINATION): vol.All(cv.string, expand_path, cv.isdir),
+        vol.Required(CONF_PATCH): vol.All(cv.string, expand_path, cv.isdir),
     },
     extra=vol.ALLOW_EXTRA,
 )
@@ -81,12 +94,12 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     async def async_reload(_: ServiceCall) -> None:
         """Patch the core files using the new configuration."""
-        config = config_utils.load_yaml_config_file(
-            hass.config.path(config_utils.YAML_CONFIG_FILE)
+        config = homeassistant.config.load_yaml_config_file(
+            hass.config.path(homeassistant.config.YAML_CONFIG_FILE)
         )
         if DOMAIN not in config:
             raise IntegrationError(
-                f"'{DOMAIN}' section was not found in {config_utils.YAML_CONFIG_FILE}"
+                f"'{DOMAIN}' section was not found in {homeassistant.config.YAML_CONFIG_FILE}"
             )
         await Patch(hass, CONFIG_SCHEMA({DOMAIN: config[DOMAIN]})[DOMAIN]).run()
 

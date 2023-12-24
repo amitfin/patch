@@ -30,6 +30,7 @@ from pytest_homeassistant_custom_component.common import (
     async_fire_time_changed,
 )
 
+from custom_components.patch import expand_path
 from custom_components.patch.const import (
     CONF_DESTINATION,
     CONF_FILES,
@@ -284,3 +285,29 @@ async def test_negative_delay(
         DOMAIN,
         {DOMAIN: {CONF_DELAY: -1}},
     )
+
+
+def test_expand_path() -> None:
+    """Test path with variables."""
+    for variable in ["site-packages", "homeassistant"]:
+        assert expand_path(f"{{{variable}}}").endswith(f"{os.path.sep}{variable}")
+
+
+async def test_expand_path_config(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """Test configuration with variables."""
+    await async_setup(
+        hass,
+        {
+            CONF_FILES: [
+                {
+                    CONF_NAME: "__init__.py",
+                    CONF_BASE: "{site-packages}/aiofiles",
+                    CONF_DESTINATION: "{site-packages}/aiofiles",
+                    CONF_PATCH: "{site-packages}/aiofiles",
+                }
+            ]
+        },
+    )
+    await async_next_day(hass, freezer)
