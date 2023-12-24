@@ -43,7 +43,7 @@ If a patch was applied (to one file or more) the integration initiates a restart
 
 All files must exist (e.g. `base/name`, etc') inside the Home Assistant Core environment. It’s convenient to mount `base` and `patch` directories as [network shares](https://www.home-assistant.io/common-tasks/os#network-storage).
 
-The directories can use the following variables:
+The `destination` directory can use the following variables as a prefix:
 
 1. `site-packages`: path to the location of Python libraries (e.g. `/usr/local/lib/python3.11/site-packages`).
 2. `homeassistant`: path to the `homeassistant` directory, i.e. `/usr/src/homeassistant/homeassistant` (the 2nd `/homeassistant` is not a mistake. There is `homeassistant` directory under the root.)
