@@ -4,6 +4,7 @@ from __future__ import annotations
 import datetime
 import os
 import tempfile
+import yaml
 from unittest.mock import AsyncMock, patch
 
 import voluptuous as vol
@@ -299,15 +300,15 @@ async def test_expand_path_config(
     """Test configuration with variables."""
     await async_setup(
         hass,
-        {
-            CONF_FILES: [
-                {
-                    CONF_NAME: "__init__.py",
-                    CONF_BASE: "{site-packages}/aiofiles",
-                    CONF_DESTINATION: "{site-packages}/aiofiles",
-                    CONF_PATCH: "{site-packages}/aiofiles",
-                }
-            ]
-        },
+        yaml.load(
+            """
+            files:
+              - name: __init__.py
+                base: "{site-packages}/aiofiles"
+                destination: "{site-packages}/aiofiles"
+                patch: "{site-packages}/aiofiles"
+            """,
+            Loader=yaml.SafeLoader,
+        ),
     )
     await async_next_day(hass, freezer)

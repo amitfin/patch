@@ -36,7 +36,12 @@ from .const import (
 )
 
 PATH_VARIABLES = {
-    "site-packages": next(filter(lambda x: x.endswith("site-packages"), sys.path)),
+    "site-packages": next(
+        filter(
+            lambda x: x.split(os.path.sep)[-1] == "site-packages" and os.path.isdir(x),
+            sys.path,
+        )
+    ),
     "homeassistant": os.path.dirname(homeassistant.__file__),
 }
 
