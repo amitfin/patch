@@ -45,7 +45,7 @@ All files must exist (e.g. `base/name`, etc') inside the Home Assistant Core env
 
 The `destination` directory can use the following variables as a prefix:
 
-1. `site-packages`: path to the location of Python libraries (e.g. `/usr/local/lib/python3.11/site-packages`).
+1. `site-packages`: path to the location of Python libraries (e.g. `/usr/local/lib/python3.12/site-packages`).
 2. `homeassistant`: path to the `homeassistant` directory, i.e. `/usr/src/homeassistant/homeassistant` (the 2nd `/homeassistant` is not a mistake. There is `homeassistant` directory under the root.)
 
 ## Install
@@ -63,7 +63,7 @@ Home Assistant restart is required once the integration files are copied (either
 Home Assistant can run in different configurations. A common one is Home Assistant Operating System, which will be used in the explanation below. In this configuration Home Assistant Core runs as a container. The 2 most relevant directories are:
 
 1. `/usr/src/homeassistant`: this is the place with Home Assistant files built from the [Core repository](https://github.com/home-assistant/core). The variable `homeassistant` can be used as a prefix in the `destination` parameter and it will be resolved to `/usr/src/homeassistant/homeassistant` (the 2nd `/homeassistant` is not a mistake. There is `homeassistant` directory under the root.)
-2. `/usr/local/lib/python3.11/site-packages`: this is the place where Python libraries are installed. (Note: `python3.11` will be changed when Home Assistant upgrades its Python version.) The variable `site-packages` can be used as a prefix in the `destination` parameter and it will be resolved automatically.
+2. `/usr/local/lib/python3.12/site-packages`: this is the place where Python libraries are installed. (Note: `python3.12` will be changed when Home Assistant upgrades its Python version.) The variable `site-packages` can be used as a prefix in the `destination` parameter and it will be resolved automatically.
 
 It’s possible to explore the environment along with the file system structure and content by:
 
