@@ -1,4 +1,4 @@
 aiofiles
 homeassistant
 pytest-homeassistant-custom-component
-ruff==0.1.13
+ruff==0.3.4
