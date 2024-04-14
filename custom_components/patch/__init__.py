@@ -4,7 +4,6 @@ from __future__ import annotations
 import datetime
 from enum import StrEnum
 import os
-import sys
 
 import voluptuous as vol
 
