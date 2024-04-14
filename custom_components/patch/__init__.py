@@ -36,12 +36,7 @@ from .const import (
 )
 
 PATH_VARIABLES = {
-    "site-packages": next(
-        filter(
-            lambda x: x.split(os.path.sep)[-1] == "site-packages" and os.path.isdir(x),
-            sys.path,
-        )
-    ),
+    "site-packages": os.path.sep.join(aiofiles.__file__.split(os.path.sep)[0:-2]),
     "homeassistant": os.path.dirname(homeassistant.__file__),
 }
 

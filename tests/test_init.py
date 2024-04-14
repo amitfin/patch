@@ -48,14 +48,14 @@ async def async_setup(hass: HomeAssistant, config: ConfigType | None = None) -> 
         DOMAIN,
         {DOMAIN: config or {}},
     )
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
 
 
 async def async_next_day(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
     """Jump to the next day and execute all pending timers."""
     freezer.move_to(dt_util.now() + datetime.timedelta(days=1))
     async_fire_time_changed(hass)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
 
 
 async def test_empty_config(
@@ -211,7 +211,7 @@ async def test_reload(
             },
         ):
             await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
-            await hass.async_block_till_done()
+            await hass.async_block_till_done(wait_background_tasks=True)
         with open(os.path.join(destination, "file"), encoding="ascii") as file:
             assert file.read() == "456"
     assert len(core_reload_calls) == 1
@@ -304,9 +304,13 @@ async def test_expand_path_config(
             """
             files:
               - name: __init__.py
-                base: "{site-packages}/aiofiles"
-                destination: "{site-packages}/aiofiles"
-                patch: "{site-packages}/aiofiles"
+                base: "{site-packages}/homeassistant"
+                destination: "{site-packages}/homeassistant"
+                patch: "{site-packages}/homeassistant"
+              - name: __init__.py
+                base: "{homeassistant}"
+                destination: "{homeassistant}"
+                patch: "{homeassistant}"
             """,
             Loader=yaml.SafeLoader,
         ),
