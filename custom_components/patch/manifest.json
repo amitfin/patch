@@ -8,7 +8,7 @@
   "integration_type": "service",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/amitfin/patch/issues",
-  "quality_scale": "platinum",
+  "quality_scale": "silver",
   "requirements": [
     "aiofiles"
   ],
