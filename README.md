@@ -23,6 +23,7 @@ _Note: When the change is inside an integration code, it's possible to override 
 ```
 patch:
   delay: 60
+  restart: true
   files:
     - name: adm_mapping.json
       base: /share/fileserver/pysiaalarm/base/data
@@ -30,9 +31,9 @@ patch:
       patch: /share/fileserver/pysiaalarm/patch/data
 ```
 
-`delay` is an optional parameter, with a default of 300 seconds (5 minutes). This is the delay between the startup time of the integration and when it applies the patches.
+`delay` is an optional integer parameter, with a default of 300 (seconds, which is 5 minutes). This is the delay between the startup time of the integration and when it applies the patches.
 
-If a patch was applied (to one file or more) the integration initiates a restart of Home Assistant (Core). This should happen only once since the next time (after the restart) there should be no further patches.
+`restart` is an optional boolean parameter, with a default of `true`. If a patch was applied (to one file or more) and this parameter is `true` the integration initiates a restart of Home Assistant (Core). This should happen only once since the next time (after the restart) there should be no further patches.
 
 `files` is a list of patches to apply. Each item on the list has the following properties (all are mandatory):
 

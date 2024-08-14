@@ -30,6 +30,7 @@ from .const import (
     CONF_DESTINATION,
     CONF_FILES,
     CONF_PATCH,
+    CONF_RESTART,
     DEFAULT_DELAY_SECONDS,
     DOMAIN,
     LOGGER,
@@ -72,9 +73,11 @@ CONFIG_SCHEMA = vol.Schema(
     {
         DOMAIN: vol.Schema(
             {
-                vol.Optional(CONF_DELAY): vol.All(
-                    vol.Coerce(int), vol.Range(min=0, min_included=True)
+                vol.Required(CONF_DELAY, default=DEFAULT_DELAY_SECONDS): vol.All(
+                    vol.Coerce(int),
+                    vol.Range(min=0, min_included=True),
                 ),
+                vol.Required(CONF_RESTART, default=True): cv.boolean,
                 vol.Optional(CONF_FILES): vol.All(
                     cv.ensure_list, [CONFIG_FILE_SCHEMA], [validate_files]
                 ),
@@ -114,10 +117,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     event.async_track_point_in_time(
         hass,
         Patch(hass, config[DOMAIN]).run,
-        dt_util.now()
-        + datetime.timedelta(
-            seconds=config[DOMAIN].get(CONF_DELAY, DEFAULT_DELAY_SECONDS)
-        ),
+        dt_util.now() + datetime.timedelta(seconds=config[DOMAIN][CONF_DELAY]),
     )
 
     return True
@@ -134,7 +134,7 @@ class Patch:
     @callback
     async def run(self, _: datetime.datetime | None = None) -> None:
         """Execute."""
-        update = False
+        updates = 0
         base_mismatch = []
         for file in self._config.get(CONF_FILES, []):
             result = await self._patch(
@@ -145,16 +145,20 @@ class Patch:
             )
             match result:
                 case PatchResult.UPDATED:
-                    update = True
+                    updates += 1
                 case PatchResult.BASE_MISMATCH:
                     base_mismatch.append(file)
         if base_mismatch:
             self._repair(base_mismatch)
-        if update:
-            LOGGER.warning("Core file(s) were patched. Restarting HA core.")
-            await self._hass.services.async_call(
-                ha.DOMAIN, SERVICE_HOMEASSISTANT_RESTART
+        if updates > 0:
+            LOGGER.warning(
+                f"{updates} core file {'s were' if updates > 1 else 'was'} patched."
             )
+            if self._config[CONF_RESTART]:
+                LOGGER.warning("Restarting HA core.")
+                await self._hass.services.async_call(
+                    ha.DOMAIN, SERVICE_HOMEASSISTANT_RESTART
+                )
 
     async def _patch(
         self,

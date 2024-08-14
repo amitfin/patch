@@ -35,6 +35,7 @@ from custom_components.patch.const import (
     CONF_DESTINATION,
     CONF_FILES,
     CONF_PATCH,
+    CONF_RESTART,
     DEFAULT_DELAY_SECONDS,
     DOMAIN,
     SERVICE_HOMEASSISTANT_RESTART,
@@ -97,13 +98,14 @@ async def test_delay(
 
 @patch("homeassistant.core.ServiceRegistry.async_call")
 @pytest.mark.parametrize(
-    ("base_content", "destination_content", "patch_content", "restart"),
+    ("base_content", "destination_content", "patch_content", "update", "restart"),
     [
-        ("old", "old", "new", True),
-        ("def", "abc", "abc", False),
-        ("abc", "def", "ghi", False),
+        ("old", "old", "new", True, True),
+        ("old", "old", "new", True, False),
+        ("def", "abc", "abc", False, True),
+        ("abc", "def", "ghi", False, True),
     ],
-    ids=["update", "identical", "different base"],
+    ids=["update", "update no restart", "identical", "different base"],
 )
 async def test_patch(  # noqa: PLR0913
     async_call_mock: AsyncMock,
@@ -113,6 +115,7 @@ async def test_patch(  # noqa: PLR0913
     base_content: str,
     destination_content: str,
     patch_content: str,
+    update: bool,  # noqa: FBT001
     restart: bool,  # noqa: FBT001
 ) -> None:
     """Test updating a file."""
@@ -131,6 +134,7 @@ async def test_patch(  # noqa: PLR0913
         await async_setup(
             hass,
             {
+                CONF_RESTART: restart,
                 CONF_FILES: [
                     {
                         CONF_NAME: "file",
@@ -138,7 +142,7 @@ async def test_patch(  # noqa: PLR0913
                         CONF_DESTINATION: destination,
                         CONF_PATCH: patch_dir,
                     }
-                ]
+                ],
             },
         )
         await async_next_day(hass, freezer)
@@ -148,16 +152,20 @@ async def test_patch(  # noqa: PLR0913
                 if base_content == destination_content
                 else destination_content
             )
-    assert async_call_mock.call_count == (1 if restart else 0)
+    assert async_call_mock.call_count == (1 if update and restart else 0)
     assert len(repairs) == (
-        1 if not restart and destination_content != patch_content else 0
+        1 if not update and destination_content != patch_content else 0
     )
-    if restart:
-        assert async_call_mock.await_args_list[0].args[0] == ha.DOMAIN
-        assert (
-            async_call_mock.await_args_list[0].args[1] == SERVICE_HOMEASSISTANT_RESTART
-        )
+    if update:
         assert "was updated by the patch file" in caplog.text
+        assert "1 core file was patched." in caplog.text
+        if restart:
+            assert async_call_mock.await_args_list[0].args[0] == ha.DOMAIN
+            assert (
+                async_call_mock.await_args_list[0].args[1]
+                == SERVICE_HOMEASSISTANT_RESTART
+            )
+            assert "Restarting HA core." in caplog.text
     elif destination_content == patch_content:
         assert "is identical to the patch file" in caplog.text
     else:
