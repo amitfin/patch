@@ -1,29 +1,30 @@
 """Update local files."""
+
 from __future__ import annotations
 
 import datetime
 from enum import StrEnum
-import os
-
-import voluptuous as vol
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 import aiofiles
 import aiofiles.os
-
 import homeassistant
-from homeassistant.components.homeassistant import SERVICE_HOMEASSISTANT_RESTART
+import homeassistant.config
+import homeassistant.core as ha
+import homeassistant.util.dt as dt_util
+import voluptuous as vol
 from homeassistant.const import (
     CONF_BASE,
     CONF_DELAY,
     CONF_NAME,
     SERVICE_RELOAD,
 )
-import homeassistant.core as ha
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import IntegrationError
-from homeassistant.helpers import config_validation as cv, event, issue_registry as ir
-from homeassistant.helpers.typing import ConfigType
-import homeassistant.util.dt as dt_util
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import event
+from homeassistant.helpers import issue_registry as ir
 
 from .const import (
     CONF_DESTINATION,
@@ -32,11 +33,15 @@ from .const import (
     DEFAULT_DELAY_SECONDS,
     DOMAIN,
     LOGGER,
+    SERVICE_HOMEASSISTANT_RESTART,
 )
 
+if TYPE_CHECKING:
+    from homeassistant.helpers.typing import ConfigType
+
 PATH_VARIABLES = {
-    "site-packages": os.path.sep.join(aiofiles.__file__.split(os.path.sep)[0:-2]),
-    "homeassistant": os.path.dirname(homeassistant.__file__),
+    "site-packages": str(Path(aiofiles.__file__).parent.parent),
+    "homeassistant": str(Path(homeassistant.__file__).parent),
 }
 
 
@@ -59,7 +64,7 @@ CONFIG_FILE_SCHEMA = vol.Schema(
 def validate_files(single_patch: dict[str, str]) -> dict[str, str]:
     """Validate all files of a patch configuration."""
     for dir_property in (CONF_BASE, CONF_DESTINATION, CONF_PATCH):
-        cv.isfile(os.path.join(single_patch[dir_property], single_patch[CONF_NAME]))
+        cv.isfile(Path(single_patch[dir_property]) / single_patch[CONF_NAME])
     return single_patch
 
 
@@ -97,9 +102,11 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             hass.config.path(homeassistant.config.YAML_CONFIG_FILE)
         )
         if DOMAIN not in config:
-            raise IntegrationError(
-                f"'{DOMAIN}' section was not found in {homeassistant.config.YAML_CONFIG_FILE}"
+            message = (
+                f"'{DOMAIN}' section was not found in "
+                f"{homeassistant.config.YAML_CONFIG_FILE}"
             )
+            raise IntegrationError(message)
         await Patch(hass, CONFIG_SCHEMA({DOMAIN: config[DOMAIN]})[DOMAIN]).run()
 
     hass.services.async_register(DOMAIN, SERVICE_RELOAD, async_reload, vol.Schema({}))
@@ -125,7 +132,7 @@ class Patch:
         self._config = config
 
     @callback
-    async def run(self, *_) -> None:
+    async def run(self, _: datetime.datetime | None = None) -> None:
         """Execute."""
         update = False
         base_mismatch = []
@@ -157,9 +164,9 @@ class Patch:
         patch_directory: str,
     ) -> PatchResult:
         """Check if identical files and update the destination if needed."""
-        base = os.path.join(base_directory, name)
-        destination = os.path.join(destination_directory, name)
-        patch = os.path.join(patch_directory, name)
+        base = Path(base_directory) / name
+        destination = Path(destination_directory) / name
+        patch = Path(patch_directory) / name
         async with aiofiles.open(base) as file:
             base_content = await file.read()
         async with aiofiles.open(destination) as file:

@@ -1,31 +1,30 @@
 """The tests for the patch integration."""
+
 from __future__ import annotations
 
 import datetime
 import os
 import tempfile
-import yaml
+from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, patch
 
-import voluptuous as vol
-
+import homeassistant.core as ha
+import homeassistant.util.dt as dt_util
 import pytest
-from freezegun.api import FrozenDateTimeFactory
-
-from homeassistant.components.homeassistant import SERVICE_HOMEASSISTANT_RESTART
+import voluptuous as vol
+import voluptuous.error as vol_error
+import yaml
 from homeassistant.const import (
     CONF_BASE,
     CONF_DELAY,
     CONF_NAME,
     SERVICE_RELOAD,
 )
-import homeassistant.core as ha
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import IntegrationError
 from homeassistant.helpers import issue_registry as ir
-from homeassistant.helpers.typing import ConfigType
 from homeassistant.setup import async_setup_component
-import homeassistant.util.dt as dt_util
 from pytest_homeassistant_custom_component.common import (
     async_capture_events,
     async_fire_time_changed,
@@ -38,7 +37,12 @@ from custom_components.patch.const import (
     CONF_PATCH,
     DEFAULT_DELAY_SECONDS,
     DOMAIN,
+    SERVICE_HOMEASSISTANT_RESTART,
 )
+
+if TYPE_CHECKING:
+    from freezegun.api import FrozenDateTimeFactory
+    from homeassistant.helpers.typing import ConfigType
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType | None = None) -> None:
@@ -67,7 +71,7 @@ async def test_empty_config(
 
 
 @pytest.mark.parametrize(
-    ["delay", "expected_delay"],
+    ("delay", "expected_delay"),
     [(None, DEFAULT_DELAY_SECONDS), (123, 123), (0, 0)],
     ids=["default", "custom", "zero"],
 )
@@ -93,7 +97,7 @@ async def test_delay(
 
 @patch("homeassistant.core.ServiceRegistry.async_call")
 @pytest.mark.parametrize(
-    ["base_content", "destination_content", "patch_content", "restart"],
+    ("base_content", "destination_content", "patch_content", "restart"),
     [
         ("old", "old", "new", True),
         ("def", "abc", "abc", False),
@@ -101,7 +105,7 @@ async def test_delay(
     ],
     ids=["update", "identical", "different base"],
 )
-async def test_patch(
+async def test_patch(  # noqa: PLR0913
     async_call_mock: AsyncMock,
     hass: HomeAssistant,
     freezer: FrozenDateTimeFactory,
@@ -109,7 +113,7 @@ async def test_patch(
     base_content: str,
     destination_content: str,
     patch_content: str,
-    restart: bool,
+    restart: bool,  # noqa: FBT001
 ) -> None:
     """Test updating a file."""
     repairs = async_capture_events(hass, ir.EVENT_REPAIRS_ISSUE_REGISTRY_UPDATED)
@@ -118,11 +122,11 @@ async def test_patch(
         tempfile.TemporaryDirectory() as destination,
         tempfile.TemporaryDirectory() as patch_dir,
     ):
-        with open(os.path.join(base, "file"), "w", encoding="ascii") as file:
+        with (Path(base) / "file").open("w", encoding="ascii") as file:
             file.write(base_content)
-        with open(os.path.join(destination, "file"), "w", encoding="ascii") as file:
+        with (Path(destination) / "file").open("w", encoding="ascii") as file:
             file.write(destination_content)
-        with open(os.path.join(patch_dir, "file"), "w", encoding="ascii") as file:
+        with (Path(patch_dir) / "file").open("w", encoding="ascii") as file:
             file.write(patch_content)
         await async_setup(
             hass,
@@ -138,7 +142,7 @@ async def test_patch(
             },
         )
         await async_next_day(hass, freezer)
-        with open(os.path.join(destination, "file"), encoding="ascii") as file:
+        with (Path(destination) / "file").open(encoding="ascii") as file:
             assert file.read() == (
                 patch_content
                 if base_content == destination_content
@@ -189,11 +193,11 @@ async def test_reload(
         tempfile.TemporaryDirectory() as destination,
         tempfile.TemporaryDirectory() as patch_dir,
     ):
-        with open(os.path.join(base, "file"), "w", encoding="ascii") as file:
+        with (Path(base) / "file").open("w", encoding="ascii") as file:
             file.write("123")
-        with open(os.path.join(destination, "file"), "w", encoding="ascii") as file:
+        with (Path(destination) / "file").open("w", encoding="ascii") as file:
             file.write("123")
-        with open(os.path.join(patch_dir, "file"), "w", encoding="ascii") as file:
+        with (Path(patch_dir) / "file").open("w", encoding="ascii") as file:
             file.write("456")
         with patch(
             "homeassistant.config.load_yaml_config_file",
@@ -212,7 +216,7 @@ async def test_reload(
         ):
             await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
             await hass.async_block_till_done(wait_background_tasks=True)
-        with open(os.path.join(destination, "file"), encoding="ascii") as file:
+        with (Path(destination) / "file").open(encoding="ascii") as file:
             assert file.read() == "456"
     assert len(core_reload_calls) == 1
 
@@ -224,22 +228,25 @@ async def test_reload_no_config(
     """Test reload service with no configuration."""
     await async_setup(hass)
     await async_next_day(hass, freezer)
-    with patch(
-        "homeassistant.config.load_yaml_config_file",
-        return_value={},
-    ), pytest.raises(IntegrationError):
+    with (
+        patch(
+            "homeassistant.config.load_yaml_config_file",
+            return_value={},
+        ),
+        pytest.raises(IntegrationError),
+    ):
         await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
 
 
 @pytest.mark.parametrize(
     ("name", "base", "destination", "patch_dir", "error"),
-    (
+    [
         ("test", ".", ".", ".", "not a file"),
         ("test", "dummy", ".", ".", "not a directory"),
-    ),
+    ],
     ids=["no file", "no directory"],
 )
-async def test_invalid_config(
+async def test_invalid_config(  # noqa: PLR0913
     hass: HomeAssistant,
     freezer: FrozenDateTimeFactory,
     name: str,
@@ -251,21 +258,24 @@ async def test_invalid_config(
     """Test file doesn't exist."""
     await async_setup(hass)
     await async_next_day(hass, freezer)
-    with patch(
-        "homeassistant.config.load_yaml_config_file",
-        return_value={
-            DOMAIN: {
-                CONF_FILES: [
-                    {
-                        CONF_NAME: name,
-                        CONF_BASE: base,
-                        CONF_DESTINATION: destination,
-                        CONF_PATCH: patch_dir,
-                    }
-                ]
-            }
-        },
-    ), pytest.raises(vol.error.MultipleInvalid) as err:
+    with (
+        patch(
+            "homeassistant.config.load_yaml_config_file",
+            return_value={
+                DOMAIN: {
+                    CONF_FILES: [
+                        {
+                            CONF_NAME: name,
+                            CONF_BASE: base,
+                            CONF_DESTINATION: destination,
+                            CONF_PATCH: patch_dir,
+                        }
+                    ]
+                }
+            },
+        ),
+        pytest.raises(vol_error.MultipleInvalid) as err,
+    ):
         await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
     assert error in str(err.value)
 

@@ -1,4 +1,5 @@
 """Constants for the patch integration."""
+
 import logging
 from typing import Final
 
@@ -9,3 +10,5 @@ CONF_DESTINATION: Final = "destination"
 CONF_FILES = "files"
 CONF_PATCH = "patch"
 DEFAULT_DELAY_SECONDS = 300
+
+SERVICE_HOMEASSISTANT_RESTART: Final = "restart"
