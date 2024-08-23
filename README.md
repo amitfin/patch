@@ -73,7 +73,7 @@ It’s possible to explore the environment along with the file system structure 
 
 ## Reload
 
-The integration also exposes a `reload` custom service. The delay parameter is ignored in this case and the logic is executed immediately, including Home Assistant restart, when needed.
+The integration also exposes a `reload` action. The delay parameter is ignored in this case and the logic is executed immediately, including Home Assistant restart, when needed.
 
 ## Re-patching
 
