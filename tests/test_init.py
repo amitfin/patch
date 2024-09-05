@@ -7,7 +7,7 @@ import os
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import homeassistant.core as ha
 import homeassistant.util.dt as dt_util
@@ -56,11 +56,18 @@ async def async_setup(hass: HomeAssistant, config: ConfigType | None = None) -> 
     await hass.async_block_till_done(wait_background_tasks=True)
 
 
-async def async_next_day(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
-    """Jump to the next day and execute all pending timers."""
-    freezer.move_to(dt_util.now() + datetime.timedelta(days=1))
+async def async_next_minutes(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, minutes: float = 1
+) -> None:
+    """Jump to the next minutes and execute all pending timers."""
+    freezer.move_to(dt_util.now() + datetime.timedelta(minutes=minutes))
     async_fire_time_changed(hass)
     await hass.async_block_till_done(wait_background_tasks=True)
+
+
+async def async_next_day(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
+    """Jump to the next day and execute all pending timers."""
+    await async_next_minutes(hass, freezer, 60 * 24)
 
 
 async def test_empty_config(
@@ -78,7 +85,7 @@ async def test_empty_config(
 )
 @patch("homeassistant.helpers.event.async_track_point_in_time")
 async def test_delay(
-    async_track_point_in_time_mock: AsyncMock,
+    async_track_point_in_time_mock: Mock,
     hass: HomeAssistant,
     freezer: FrozenDateTimeFactory,
     delay: int | None,
@@ -334,3 +341,27 @@ async def test_expand_path_config(
         ),
     )
     await async_next_day(hass, freezer)
+
+
+@patch("homeassistant.helpers.recorder.async_migration_in_progress")
+async def test_wait_for_recorder_migration(
+    async_migration_in_progress_mock: Mock,
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test waiting for recorder migration to complete."""
+
+    def _delay_count(log: str) -> int:
+        return log.count("Recorder migration in progress. Checking again in a minute.")
+
+    await async_setup(hass)
+    async_migration_in_progress_mock.return_value = True
+    await async_next_minutes(hass, freezer, DEFAULT_DELAY_SECONDS / 60)
+    assert _delay_count(caplog.text) == 1
+    for i in range(2, 10):
+        await async_next_minutes(hass, freezer)
+        assert _delay_count(caplog.text) == i
+    async_migration_in_progress_mock.return_value = False
+    await async_next_day(hass, freezer)
+    assert _delay_count(caplog.text) == i

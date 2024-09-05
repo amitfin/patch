@@ -23,7 +23,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import IntegrationError
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers import event
+from homeassistant.helpers import event, recorder
 from homeassistant.helpers import issue_registry as ir
 
 from .const import (
@@ -116,7 +116,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     event.async_track_point_in_time(
         hass,
-        Patch(hass, config[DOMAIN]).run,
+        Patch(hass, config[DOMAIN]).run_after_migration,
         dt_util.now() + datetime.timedelta(seconds=config[DOMAIN][CONF_DELAY]),
     )
 
@@ -132,7 +132,19 @@ class Patch:
         self._config = config
 
     @callback
-    async def run(self, _: datetime.datetime | None = None) -> None:
+    async def run_after_migration(self, _: datetime.datetime | None = None) -> None:
+        """Run if there is no migration in progress."""
+        if recorder.async_migration_in_progress(self._hass):
+            LOGGER.info("Recorder migration in progress. Checking again in a minute.")
+            event.async_track_point_in_time(
+                self._hass,
+                self.run_after_migration,
+                dt_util.now() + datetime.timedelta(minutes=1),
+            )
+        else:
+            await self.run()
+
+    async def run(self) -> None:
         """Execute."""
         updates = 0
         base_mismatch = []
