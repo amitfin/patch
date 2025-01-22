@@ -214,7 +214,7 @@ class Patch:
 
     def _repair(self, files: list[dict[str, str]]) -> None:
         """Report an issue of base file mismatch."""
-        file_names = ", ".join(f'"{ file[CONF_NAME] }"' for file in files)
+        file_names = ", ".join(f'"{file[CONF_NAME]}"' for file in files)
         message = (
             f"The file {file_names} is"
             if len(files) == 1
