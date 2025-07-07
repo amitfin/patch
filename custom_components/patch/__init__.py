@@ -101,9 +101,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     async def async_reload(_: ServiceCall) -> None:
         """Patch the core files using the new configuration."""
-        config = homeassistant.config.load_yaml_config_file(
-            hass.config.path(homeassistant.config.YAML_CONFIG_FILE)
-        )
+        config = await homeassistant.config.async_hass_config_yaml(hass)
         if DOMAIN not in config:
             message = (
                 f"'{DOMAIN}' section was not found in "
