@@ -78,3 +78,18 @@ The integration also exposes a `reload` action. The delay parameter is ignored i
 ## Re-patching
 
 It's not possible to re-patch a file by simply updating the content of `patch/name`. The problem is that `destination/name` was already patched, so it's different than `base/name` and therefore will not be patched again. The solution is to change `base` to be the same as `destination`. This will cause the comparison to succeed as both will be pointing the same file. Once the patch is applied, `base` should get reverted to it's original value, so the patch can be safely re-applied on Home Assistant update (only if the file is still identical to base.)
+
+## Uninstall
+
+1. **Delete the configuration:**
+   - Delete the `patch:` section from `configuration.yaml`.
+
+2. **Remove the integration files:**
+   - If the integration was installed via **HACS**, follow the [official HACS removal instructions](https://www.hacs.xyz/docs/use/repositories/dashboard/#removing-a-repository).
+   - Otherwise, manually delete the integration’s folder `custom_components/patch`.
+
+📌 A **Home Assistant core restart** is required to fully apply the removal.
+
+## Contributions are welcome!
+
+If you want to contribute to this please read the [Contribution guidelines](CONTRIBUTING.md)
