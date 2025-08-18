@@ -8,18 +8,17 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import aiofiles
-import aiofiles.os
 import homeassistant
-import homeassistant.config
-import homeassistant.core as ha
 import homeassistant.util.dt as dt_util
 import voluptuous as vol
+from homeassistant.config import YAML_CONFIG_FILE, async_hass_config_yaml
 from homeassistant.const import (
     CONF_BASE,
     CONF_DELAY,
     CONF_NAME,
     SERVICE_RELOAD,
 )
+from homeassistant.core import DOMAIN as HA_DOMAIN
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import IntegrationError
 from homeassistant.helpers import config_validation as cv
@@ -101,12 +100,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     async def async_reload(_: ServiceCall) -> None:
         """Patch the core files using the new configuration."""
-        config = await homeassistant.config.async_hass_config_yaml(hass)
+        config = await async_hass_config_yaml(hass)
         if DOMAIN not in config:
-            message = (
-                f"'{DOMAIN}' section was not found in "
-                f"{homeassistant.config.YAML_CONFIG_FILE}"
-            )
+            message = f"'{DOMAIN}' section was not found in {YAML_CONFIG_FILE}"
             raise IntegrationError(message)
         await Patch(hass, CONFIG_SCHEMA({DOMAIN: config[DOMAIN]})[DOMAIN]).run()
 
@@ -167,7 +163,7 @@ class Patch:
             if self._config[CONF_RESTART]:
                 LOGGER.warning("Restarting HA core.")
                 await self._hass.services.async_call(
-                    ha.DOMAIN, SERVICE_HOMEASSISTANT_RESTART
+                    HA_DOMAIN, SERVICE_HOMEASSISTANT_RESTART
                 )
 
     async def _patch(
