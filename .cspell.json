@@ -2,19 +2,20 @@
   "version": "0.2",
   "language": "en",
   "words": [
-    "homeassistant",
-    "hass",
-    "HACS",
-    "codeowners",
-    "amitfin",
-    "pytest",
-    "venv",
-    "autouse",
-    "freezegun",
-    "caplog",
-    "PYTHONPATH",
     "aiofiles",
+    "amitfin",
+    "autouse",
+    "caplog",
+    "codeowners",
     "fileserver",
-    "pysiaalarm"
+    "freezegun",
+    "HACS",
+    "hass",
+    "homeassistant",
+    "mypy",
+    "pysiaalarm",
+    "pytest",
+    "PYTHONPATH",
+    "venv"
   ]
 }
