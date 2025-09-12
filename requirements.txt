@@ -1,5 +1,5 @@
 pytest-homeassistant-custom-component
 aiofiles
 ruff==0.13.0
-mypy==1.17.1
+mypy==1.18.1
 types-aiofiles
