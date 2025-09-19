@@ -25,6 +25,10 @@ patch:
   delay: 60
   restart: true
   files:
+    - name: coolmasternet.py
+      base: https://raw.githubusercontent.com/OnFreund/pycoolmasternet-async/b463ac6101c25b027ecfb62c3d4edcc5bfbf4379/pycoolmasternet_async
+      destination: "{site-packages}/pycoolmasternet_async"
+      patch: https://raw.githubusercontent.com/amitfin/pycoolmasternet-async/wait-for-prompt/pycoolmasternet_async
     - name: adm_mapping.json
       base: /share/fileserver/pysiaalarm/base/data
       destination: "{site-packages}/pysiaalarm/data"
@@ -38,11 +42,11 @@ patch:
 `files` is a list of patches to apply. Each item on the list has the following properties (all are mandatory):
 
 - `name`: the file name
-- `base`: the directory containing an original copy of the file (before the patch). The patch happens only if the content of the file to be patched (`destination/name`) is identical to the content of the base file (`base/name`). Otherwise, a repair issue is raised. In such a case, a rebase of the patch is required along with updating the content of the files `base/name` and `patch/name`.
+- `base`: the directory containing an original copy of the file (before the patch). The patch happens only if the content of the file to be patched (`destination/name`) is identical to the content of the base file (`base/name`). Otherwise, a repair issue is raised. In such a case, a rebase of the patch is required along with updating the content of the files `base/name` and `patch/name`. This parameter can be provided as a local path or as a URL.
 - `destination`: the local directory with the file to be patched.
-- `patch`: the directory containing the file with the change.
+- `patch`: the directory containing the file with the change. It can be provided as a local path or as a URL.
 
-All files must exist (e.g. `base/name`, etc') inside the Home Assistant Core environment. It’s convenient to mount `base` and `patch` directories as [network shares](https://www.home-assistant.io/common-tasks/os#network-storage).
+All files must exist (e.g. `base/name`, etc') inside the Home Assistant Core environment. It’s convenient to mount `base` and `patch` directories as [network shares](https://www.home-assistant.io/common-tasks/os#network-storage), or provide them as URLs.
 
 The `destination` directory can use the following variables as a prefix:
 

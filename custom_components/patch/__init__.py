@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
+from urllib.parse import ParseResult, urlparse
 
 import aiofiles
 import homeassistant
@@ -24,6 +26,7 @@ from homeassistant.exceptions import IntegrationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import event, recorder
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     CONF_DESTINATION,
@@ -53,9 +56,13 @@ def expand_path(path: str) -> str:
 CONFIG_FILE_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_NAME): cv.string,
-        vol.Required(CONF_BASE): vol.All(cv.string, expand_path, cv.isdir),
+        vol.Required(CONF_BASE): vol.Any(
+            vol.All(cv.url, urlparse), vol.All(cv.string, expand_path, cv.isdir)
+        ),
         vol.Required(CONF_DESTINATION): vol.All(cv.string, expand_path, cv.isdir),
-        vol.Required(CONF_PATCH): vol.All(cv.string, expand_path, cv.isdir),
+        vol.Required(CONF_PATCH): vol.Any(
+            vol.All(cv.url, urlparse), vol.All(cv.string, expand_path, cv.isdir)
+        ),
     },
     extra=vol.ALLOW_EXTRA,
 )
@@ -64,7 +71,8 @@ CONFIG_FILE_SCHEMA = vol.Schema(
 def validate_files(single_patch: dict[str, str]) -> dict[str, str]:
     """Validate all files of a patch configuration."""
     for dir_property in (CONF_BASE, CONF_DESTINATION, CONF_PATCH):
-        cv.isfile(Path(single_patch[dir_property]) / single_patch[CONF_NAME])
+        if not isinstance(single_patch[dir_property], ParseResult):
+            cv.isfile(Path(single_patch[dir_property]) / single_patch[CONF_NAME])
     return single_patch
 
 
@@ -124,6 +132,7 @@ class Patch:
         """Initialize the object."""
         self._hass = hass
         self._config = config
+        self._http_client = async_get_clientsession(hass)
 
     @callback
     async def run_after_migration(self, _: datetime.datetime | None = None) -> None:
@@ -166,23 +175,34 @@ class Patch:
                     HA_DOMAIN, SERVICE_HOMEASSISTANT_RESTART
                 )
 
+    async def _read(self, directory: str | ParseResult, name: str) -> tuple[str, str]:
+        """Read file content."""
+        if isinstance(directory, ParseResult):
+            url = f"{directory.geturl()}/{name}"
+            async with self._http_client.get(url) as response:
+                return url, await response.text()
+
+        path = Path(directory) / name
+        async with aiofiles.open(path) as file:
+            return str(path), await file.read()
+
     async def _patch(
         self,
         name: str,
-        base_directory: str,
+        base_directory: str | ParseResult,
         destination_directory: str,
-        patch_directory: str,
+        patch_directory: str | ParseResult,
     ) -> PatchResult:
         """Check if identical files and update the destination if needed."""
-        base = Path(base_directory) / name
-        destination = Path(destination_directory) / name
-        patch = Path(patch_directory) / name
-        async with aiofiles.open(base) as file:
-            base_content = await file.read()
-        async with aiofiles.open(destination) as file:
-            destination_content = await file.read()
-        async with aiofiles.open(patch) as file:
-            patch_content = await file.read()
+        (
+            (base, base_content),
+            (destination, destination_content),
+            (patch, patch_content),
+        ) = await asyncio.gather(
+            self._read(base_directory, name),
+            self._read(destination_directory, name),
+            self._read(patch_directory, name),
+        )
         if destination_content == patch_content:
             LOGGER.debug(
                 "Destination file '%s' is identical to the patch file '%s'.",

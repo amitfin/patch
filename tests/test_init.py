@@ -44,6 +44,9 @@ from custom_components.patch.const import (
 if TYPE_CHECKING:
     from freezegun.api import FrozenDateTimeFactory
     from homeassistant.helpers.typing import ConfigType
+    from pytest_homeassistant_custom_component.test_util.aiohttp import (
+        AiohttpClientMocker,
+    )
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType | None = None) -> None:
@@ -182,6 +185,41 @@ async def test_patch(  # noqa: PLR0913
         assert repairs[0].data["issue_id"].startswith("patch_file_base_mismatch")
 
 
+@patch("homeassistant.core.ServiceRegistry.async_call")
+async def test_patch_url(
+    async_call_mock: AsyncMock,
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test updating a file using URLs."""
+    aioclient_mock.get("https://test.com/base/file", text="old")
+    aioclient_mock.get("https://test.com/patch/file", text="new")
+    with tempfile.TemporaryDirectory() as destination:
+        with (Path(destination) / "file").open("w", encoding="ascii") as file:
+            file.write("old")
+        await async_setup(
+            hass,
+            {
+                CONF_FILES: [
+                    {
+                        CONF_NAME: "file",
+                        CONF_BASE: "https://test.com/base",
+                        CONF_DESTINATION: destination,
+                        CONF_PATCH: "https://test.com/patch",
+                    }
+                ],
+            },
+        )
+        await async_next_day(hass, freezer)
+        with (Path(destination) / "file").open(encoding="ascii") as file:
+            assert file.read() == "new"
+    assert async_call_mock.call_count == 1
+    assert "was updated by the patch file" in caplog.text
+    assert "1 core file was patched." in caplog.text
+
+
 async def test_reload(
     hass: HomeAssistant,
     freezer: FrozenDateTimeFactory,
@@ -257,7 +295,7 @@ async def test_reload_no_config(
     ("name", "base", "destination", "patch_dir", "error"),
     [
         ("test", ".", ".", ".", "not a file"),
-        ("test", "dummy", ".", ".", "not a directory"),
+        ("test", "dummy", ".", ".", "invalid url"),
     ],
     ids=["no file", "no directory"],
 )
