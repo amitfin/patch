@@ -30,7 +30,7 @@ patch:
       destination: "{site-packages}/pycoolmasternet_async"
       patch: https://raw.githubusercontent.com/amitfin/pycoolmasternet-async/wait-for-prompt/pycoolmasternet_async
     - name: adm_mapping.json
-      base: /share/fileserver/pysiaalarm/base/data
+      base: https://raw.githubusercontent.com/eavanvalkenburg/pysiaalarm/394161e587f617b4c91a15d40202aa9c7d4863e1/src/pysiaalarm/data
       destination: "{site-packages}/pysiaalarm/data"
       patch: /share/fileserver/pysiaalarm/patch/data
 ```
