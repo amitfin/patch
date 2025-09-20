@@ -7,9 +7,9 @@ DOMAIN: Final = "patch"
 LOGGER = logging.getLogger(__package__)
 
 CONF_DESTINATION: Final = "destination"
-CONF_FILES = "files"
-CONF_PATCH = "patch"
-CONF_RESTART = "restart"
-DEFAULT_DELAY_SECONDS = 300
+CONF_FILES: Final = "files"
+CONF_PATCH: Final = "patch"
+CONF_RESTART: Final = "restart"
+DEFAULT_DELAY_SECONDS: Final = 300
 
 SERVICE_HOMEASSISTANT_RESTART: Final = "restart"
