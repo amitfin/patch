@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import posixpath
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING
-from urllib.parse import ParseResult, urlparse
+from typing import TYPE_CHECKING, NotRequired, TypedDict
 
 import aiofiles
 import homeassistant
@@ -27,6 +27,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import event, recorder
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from yarl import URL
 
 from .const import (
     CONF_DESTINATION,
@@ -55,25 +56,46 @@ def expand_path(path: str) -> str:
 
 CONFIG_FILE_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_NAME): cv.string,
-        vol.Required(CONF_BASE): vol.Any(
-            vol.All(cv.url, urlparse), vol.All(cv.string, expand_path, cv.isdir)
+        vol.Optional(CONF_NAME): cv.string,
+        vol.Required(CONF_DESTINATION): vol.All(
+            cv.string, expand_path, vol.Coerce(Path)
         ),
-        vol.Required(CONF_DESTINATION): vol.All(cv.string, expand_path, cv.isdir),
+        vol.Required(CONF_BASE): vol.Any(
+            vol.All(cv.url, vol.Coerce(URL)),
+            vol.All(cv.string, expand_path, vol.Coerce(Path)),
+        ),
         vol.Required(CONF_PATCH): vol.Any(
-            vol.All(cv.url, urlparse), vol.All(cv.string, expand_path, cv.isdir)
+            vol.All(cv.url, vol.Coerce(URL)),
+            vol.All(cv.string, expand_path, vol.Coerce(Path)),
         ),
     },
     extra=vol.ALLOW_EXTRA,
 )
 
 
-def validate_files(single_patch: dict[str, str]) -> dict[str, str]:
-    """Validate all files of a patch configuration."""
-    for dir_property in (CONF_BASE, CONF_DESTINATION, CONF_PATCH):
-        if not isinstance(single_patch[dir_property], ParseResult):
-            cv.isfile(Path(single_patch[dir_property]) / single_patch[CONF_NAME])
-    return single_patch
+class PatchType(TypedDict):
+    """Type for patch parameters."""
+
+    name: NotRequired[str]
+    destination: Path
+    base: Path | URL
+    patch: Path | URL
+
+
+def validate_patch(patch: PatchType) -> PatchType:
+    """Compose full path (if needed) and validate file existence."""
+    if name := patch.get(CONF_NAME):
+        del patch[CONF_NAME]
+    for param in (CONF_BASE, CONF_DESTINATION, CONF_PATCH):
+        path = patch[param]
+        if isinstance(path, Path):
+            if name:
+                path /= name
+                patch[param] = path
+            cv.isfile(str(path))
+        elif name and param != CONF_DESTINATION:  # 2nd condition is for linters
+            patch[param] = path.with_path(posixpath.join(path.path, name))
+    return patch
 
 
 CONFIG_SCHEMA = vol.Schema(
@@ -86,7 +108,7 @@ CONFIG_SCHEMA = vol.Schema(
                 ),
                 vol.Required(CONF_RESTART, default=True): cv.boolean,
                 vol.Optional(CONF_FILES): vol.All(
-                    cv.ensure_list, [CONFIG_FILE_SCHEMA], [validate_files]
+                    cv.ensure_list, [CONFIG_FILE_SCHEMA], [validate_patch]
                 ),
             }
         )
@@ -151,18 +173,13 @@ class Patch:
         """Execute."""
         updates = 0
         base_mismatch = []
-        for file in self._config.get(CONF_FILES, []):
-            result = await self._patch(
-                file[CONF_NAME],
-                file[CONF_BASE],
-                file[CONF_DESTINATION],
-                file[CONF_PATCH],
-            )
+        for patch in self._config.get(CONF_FILES, []):
+            result = await self._patch(patch)
             match result:
                 case PatchResult.UPDATED:
                     updates += 1
                 case PatchResult.BASE_MISMATCH:
-                    base_mismatch.append(file)
+                    base_mismatch.append(patch)
         if base_mismatch:
             self._repair(base_mismatch)
         if updates > 0:
@@ -175,60 +192,48 @@ class Patch:
                     HA_DOMAIN, SERVICE_HOMEASSISTANT_RESTART
                 )
 
-    async def _read(self, directory: str | ParseResult, name: str) -> tuple[str, str]:
+    async def _read(self, path: Path | URL) -> str:
         """Read file content."""
-        if isinstance(directory, ParseResult):
-            url = f"{directory.geturl()}/{name}"
-            async with self._http_client.get(url) as response:
-                return url, await response.text()
+        if isinstance(path, URL):
+            async with self._http_client.get(path) as response:
+                return await response.text()
 
-        path = Path(directory) / name
         async with aiofiles.open(path) as file:
-            return str(path), await file.read()
+            return await file.read()
 
-    async def _patch(
-        self,
-        name: str,
-        base_directory: str | ParseResult,
-        destination_directory: str,
-        patch_directory: str | ParseResult,
-    ) -> PatchResult:
+    async def _patch(self, patch: PatchType) -> PatchResult:
         """Check if identical files and update the destination if needed."""
-        (
-            (base, base_content),
-            (destination, destination_content),
-            (patch, patch_content),
-        ) = await asyncio.gather(
-            self._read(base_directory, name),
-            self._read(destination_directory, name),
-            self._read(patch_directory, name),
+        destination_content, base_content, patch_content = await asyncio.gather(
+            self._read(patch[CONF_DESTINATION]),
+            self._read(patch[CONF_BASE]),
+            self._read(patch[CONF_PATCH]),
         )
         if destination_content == patch_content:
             LOGGER.debug(
                 "Destination file '%s' is identical to the patch file '%s'.",
-                destination,
-                patch,
+                patch[CONF_DESTINATION],
+                patch[CONF_PATCH],
             )
             return PatchResult.IDENTICAL
         if destination_content != base_content:
             LOGGER.error(
                 "Destination file '%s' is different than its base '%s'.",
-                destination,
-                base,
+                patch[CONF_DESTINATION],
+                patch[CONF_BASE],
             )
             return PatchResult.BASE_MISMATCH
-        async with aiofiles.open(destination, "w") as file:
+        async with aiofiles.open(patch[CONF_DESTINATION], "w") as file:
             await file.write(patch_content)
         LOGGER.warning(
             "Destination file '%s' was updated by the patch file '%s'.",
-            destination,
-            patch,
+            patch[CONF_DESTINATION],
+            patch[CONF_PATCH],
         )
         return PatchResult.UPDATED
 
     def _repair(self, files: list[dict[str, str]]) -> None:
         """Report an issue of base file mismatch."""
-        file_names = ", ".join(f'"{file[CONF_NAME]}"' for file in files)
+        file_names = ", ".join(f'"{file[CONF_DESTINATION]}"' for file in files)
         message = (
             f"The file {file_names} is"
             if len(files) == 1

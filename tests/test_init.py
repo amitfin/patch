@@ -186,12 +186,18 @@ async def test_patch(  # noqa: PLR0913
 
 
 @patch("homeassistant.core.ServiceRegistry.async_call")
-async def test_patch_url(
+@pytest.mark.parametrize(
+    "full_path",
+    [False, True],
+    ids=["name", "full path"],
+)
+async def test_patch_url(  # noqa: PLR0913
     async_call_mock: AsyncMock,
     hass: HomeAssistant,
     aioclient_mock: AiohttpClientMocker,
     freezer: FrozenDateTimeFactory,
     caplog: pytest.LogCaptureFixture,
+    full_path: bool,  # noqa: FBT001
 ) -> None:
     """Test updating a file using URLs."""
     aioclient_mock.get("https://test.com/base/file", text="old")
@@ -199,19 +205,17 @@ async def test_patch_url(
     with tempfile.TemporaryDirectory() as destination:
         with (Path(destination) / "file").open("w", encoding="ascii") as file:
             file.write("old")
-        await async_setup(
-            hass,
-            {
-                CONF_FILES: [
-                    {
-                        CONF_NAME: "file",
-                        CONF_BASE: "https://test.com/base",
-                        CONF_DESTINATION: destination,
-                        CONF_PATCH: "https://test.com/patch",
-                    }
-                ],
-            },
-        )
+        patch = {
+            CONF_DESTINATION: destination,
+            CONF_BASE: "https://test.com/base",
+            CONF_PATCH: "https://test.com/patch",
+        }
+        if full_path:
+            for key in patch:
+                patch[key] += "/file"
+        else:
+            patch[CONF_NAME] = "file"
+        await async_setup(hass, {CONF_FILES: [patch]})
         await async_next_day(hass, freezer)
         with (Path(destination) / "file").open(encoding="ascii") as file:
             assert file.read() == "new"
@@ -291,22 +295,9 @@ async def test_reload_no_config(
         await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
 
 
-@pytest.mark.parametrize(
-    ("name", "base", "destination", "patch_dir", "error"),
-    [
-        ("test", ".", ".", ".", "not a file"),
-        ("test", "dummy", ".", ".", "invalid url"),
-    ],
-    ids=["no file", "no directory"],
-)
-async def test_invalid_config(  # noqa: PLR0913
+async def test_invalid_config(
     hass: HomeAssistant,
     freezer: FrozenDateTimeFactory,
-    name: str,
-    base: str,
-    destination: str,
-    patch_dir: str,
-    error: str,
 ) -> None:
     """Test file doesn't exist."""
     await async_setup(hass)
@@ -318,10 +309,9 @@ async def test_invalid_config(  # noqa: PLR0913
                 DOMAIN: {
                     CONF_FILES: [
                         {
-                            CONF_NAME: name,
-                            CONF_BASE: base,
-                            CONF_DESTINATION: destination,
-                            CONF_PATCH: patch_dir,
+                            CONF_DESTINATION: "test",
+                            CONF_BASE: "http://test.com",
+                            CONF_PATCH: "http://test.com",
                         }
                     ]
                 }
@@ -330,7 +320,7 @@ async def test_invalid_config(  # noqa: PLR0913
         pytest.raises(vol_error.MultipleInvalid) as err,
     ):
         await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
-    assert error in str(err.value)
+    assert "not a file @ data['patch']['files'][0]" in str(err.value)
 
 
 async def test_no_delay(

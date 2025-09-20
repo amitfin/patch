@@ -25,13 +25,12 @@ patch:
   delay: 60
   restart: true
   files:
-    - name: coolmasternet.py
-      base: https://raw.githubusercontent.com/OnFreund/pycoolmasternet-async/b463ac6101c25b027ecfb62c3d4edcc5bfbf4379/pycoolmasternet_async
-      destination: "{site-packages}/pycoolmasternet_async"
-      patch: https://raw.githubusercontent.com/amitfin/pycoolmasternet-async/wait-for-prompt/pycoolmasternet_async
+    - destination: "{site-packages}/pycoolmasternet_async/coolmasternet.py"
+      base: https://raw.githubusercontent.com/OnFreund/pycoolmasternet-async/b463ac6101c25b027ecfb62c3d4edcc5bfbf4379/pycoolmasternet_async/coolmasternet.py
+      patch: https://raw.githubusercontent.com/amitfin/pycoolmasternet-async/wait-for-prompt/pycoolmasternet_async/coolmasternet.py
     - name: adm_mapping.json
-      base: https://raw.githubusercontent.com/eavanvalkenburg/pysiaalarm/394161e587f617b4c91a15d40202aa9c7d4863e1/src/pysiaalarm/data
       destination: "{site-packages}/pysiaalarm/data"
+      base: https://raw.githubusercontent.com/eavanvalkenburg/pysiaalarm/0df5af750412421e697a106aa5ac9dfec1727398/src/pysiaalarm/data
       patch: /share/fileserver/pysiaalarm/patch/data
 ```
 
@@ -39,16 +38,16 @@ patch:
 
 `restart` is an optional boolean parameter, with a default of `true`. If a patch was applied (to one file or more) and this parameter is `true` the integration initiates a restart of Home Assistant (Core). This should happen only once since the next time (after the restart) there should be no further patches.
 
-`files` is a list of patches to apply. Each item on the list has the following properties (all are mandatory):
+`files` is a list of patches to apply. Each item on the list has the following properties:
 
-- `name`: the file name
-- `base`: the directory containing an original copy of the file (before the patch). The patch happens only if the content of the file to be patched (`destination/name`) is identical to the content of the base file (`base/name`). Otherwise, a repair issue is raised. In such a case, a rebase of the patch is required along with updating the content of the files `base/name` and `patch/name`. This parameter can be provided as a local path or as a URL.
-- `destination`: the local directory with the file to be patched.
-- `patch`: the directory containing the file with the change. It can be provided as a local path or as a URL.
+- `name`: an optional file name. If it exists, it gets appended to the rest of the properties. If it doesn't exist, the rest of the properties should be supplied as a full path, including the file name.
+- `destination`: the local path to the file which should get the patch.
+- `base`: the path to the original file (before the patch). The patch happens only if the content of the file to be patched (`destination`) is identical to the content of the base file. Otherwise, a repair issue is raised. In such a case, a rebase of the patch is required along with updating the content of the files `base` and `patch`. This parameter can be provided as a local path or as a URL.
+- `patch`: the path to the file with the change. It can be provided as a local path or as a URL.
 
-All files must exist (e.g. `base/name`, etc') inside the Home Assistant Core environment. It’s convenient to mount `base` and `patch` directories as [network shares](https://www.home-assistant.io/common-tasks/os#network-storage), or provide them as URLs.
+All files must exist inside the Home Assistant Core environment. It’s convenient to point `base` and `patch` to [network shares](https://www.home-assistant.io/common-tasks/os#network-storage), or provide them as URLs.
 
-The `destination` directory can use the following variables as a prefix:
+The `destination` path can use the following variables as a prefix:
 
 1. `site-packages`: path to the location of Python libraries (e.g. `/usr/local/lib/python3.13/site-packages`).
 2. `homeassistant`: path to the `homeassistant` directory, i.e. `/usr/src/homeassistant/homeassistant` (the 2nd `/homeassistant` is not a mistake. There is `homeassistant` directory under the root.)
@@ -81,7 +80,7 @@ The integration also exposes a `reload` action. The delay parameter is ignored i
 
 ## Re-patching
 
-It's not possible to re-patch a file by simply updating the content of `patch/name`. The problem is that `destination/name` was already patched, so it's different than `base/name` and therefore will not be patched again. The solution is to change `base` to be the same as `destination`. This will cause the comparison to succeed as both will be pointing the same file. Once the patch is applied, `base` should get reverted to it's original value, so the patch can be safely re-applied on Home Assistant update (only if the file is still identical to base.)
+It's not possible to re-patch a file by simply updating the content of `patch`. The problem is that `destination` was already patched, so it's different than `base` and therefore will not be patched again. The solution is to change `base` to be the same as `destination`. This will cause the comparison to succeed as both will be pointing the same file. Once the patch is applied, `base` should get reverted to it's original value, so the patch can be safely re-applied on Home Assistant update (only if the file is still identical to base.)
 
 ## Uninstall
 
