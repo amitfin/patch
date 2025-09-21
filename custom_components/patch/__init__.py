@@ -86,6 +86,7 @@ def validate_patch(patch: PatchType) -> PatchType:
     """Compose full path (if needed) and validate file existence."""
     if name := patch.get(CONF_NAME):
         del patch[CONF_NAME]
+
     for param in (CONF_BASE, CONF_DESTINATION, CONF_PATCH):
         path = patch[param]
         if isinstance(path, Path):
@@ -95,6 +96,7 @@ def validate_patch(patch: PatchType) -> PatchType:
             cv.isfile(str(path))
         elif name and param != CONF_DESTINATION:  # 2nd condition is for linters
             patch[param] = path.with_path(posixpath.join(path.path, name))
+
     return patch
 
 
@@ -173,6 +175,7 @@ class Patch:
         """Execute."""
         updates = 0
         base_mismatch = []
+
         for patch in self._config.get(CONF_FILES, []):
             result = await self._patch(patch)
             match result:
@@ -180,8 +183,10 @@ class Patch:
                     updates += 1
                 case PatchResult.BASE_MISMATCH:
                     base_mismatch.append(patch)
+
         if base_mismatch:
             self._repair(base_mismatch)
+
         if updates > 0:
             LOGGER.warning(
                 f"{updates} core file {'s were' if updates > 1 else 'was'} patched."
@@ -194,12 +199,12 @@ class Patch:
 
     async def _read(self, path: Path | URL) -> str:
         """Read file content."""
-        if isinstance(path, URL):
-            async with self._http_client.get(path) as response:
-                return await response.text()
+        if isinstance(path, Path):
+            async with aiofiles.open(path) as file:
+                return await file.read()
 
-        async with aiofiles.open(path) as file:
-            return await file.read()
+        async with self._http_client.get(path) as response:
+            return await response.text()
 
     async def _patch(self, patch: PatchType) -> PatchResult:
         """Check if identical files and update the destination if needed."""
@@ -208,6 +213,7 @@ class Patch:
             self._read(patch[CONF_BASE]),
             self._read(patch[CONF_PATCH]),
         )
+
         if destination_content == patch_content:
             LOGGER.debug(
                 "Destination file '%s' is identical to the patch file '%s'.",
@@ -215,6 +221,7 @@ class Patch:
                 patch[CONF_PATCH],
             )
             return PatchResult.IDENTICAL
+
         if destination_content != base_content:
             LOGGER.error(
                 "Destination file '%s' is different than its base '%s'.",
@@ -222,6 +229,7 @@ class Patch:
                 patch[CONF_BASE],
             )
             return PatchResult.BASE_MISMATCH
+
         async with aiofiles.open(patch[CONF_DESTINATION], "w") as file:
             await file.write(patch_content)
         LOGGER.warning(
@@ -239,6 +247,7 @@ class Patch:
             if len(files) == 1
             else f"The files {file_names} are"
         )
+
         ir.async_create_issue(
             self._hass,
             DOMAIN,
