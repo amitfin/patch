@@ -173,21 +173,21 @@ class Patch:
 
     async def run(self) -> None:
         """Execute."""
-        updates = 0
-        base_mismatch = []
+        if not (patches := self._config.get(CONF_FILES)):
+            return
 
-        for patch in self._config.get(CONF_FILES, []):
-            result = await self._patch(patch)
-            match result:
-                case PatchResult.UPDATED:
-                    updates += 1
-                case PatchResult.BASE_MISMATCH:
-                    base_mismatch.append(patch)
+        await self._get_urls(patches)
 
-        if base_mismatch:
+        results = await asyncio.gather(*(self._patch(patch) for patch in patches))
+
+        if base_mismatch := [
+            patch
+            for index, patch in enumerate(patches)
+            if results[index] == PatchResult.BASE_MISMATCH
+        ]:
             self._repair(base_mismatch)
 
-        if updates > 0:
+        if (updates := results.count(PatchResult.UPDATED)) > 0:
             LOGGER.warning(
                 f"{updates} core file {'s were' if updates > 1 else 'was'} patched."
             )
@@ -197,14 +197,25 @@ class Patch:
                     HA_DOMAIN, SERVICE_HOMEASSISTANT_RESTART
                 )
 
+    async def _get_url(self, url: URL) -> str:
+        """Download a URL."""
+        async with self._http_client.get(url) as response:
+            return await response.text()
+
+    async def _get_urls(self, patches: list[PatchType]) -> None:
+        """Download all URLs and store their content."""
+        urls = list(
+            {url for patch in patches for url in patch.values() if isinstance(url, URL)}
+        )
+        content = await asyncio.gather(*(self._get_url(url) for url in urls))
+        self._url_content = {url: content[index] for index, url in enumerate(urls)}
+
     async def _read(self, path: Path | URL) -> str:
         """Read file content."""
         if isinstance(path, Path):
             async with aiofiles.open(path) as file:
                 return await file.read()
-
-        async with self._http_client.get(path) as response:
-            return await response.text()
+        return self._url_content[path]
 
     async def _patch(self, patch: PatchType) -> PatchResult:
         """Check if identical files and update the destination if needed."""
