@@ -200,6 +200,7 @@ class Patch:
     async def _get_url(self, url: URL) -> str:
         """Download a URL."""
         async with self._http_client.get(url) as response:
+            response.raise_for_status()
             return await response.text()
 
     async def _get_urls(self, patches: list[PatchType]) -> None:
