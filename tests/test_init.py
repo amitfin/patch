@@ -15,6 +15,7 @@ import pytest
 import voluptuous as vol
 import voluptuous.error as vol_error
 import yaml
+from aiohttp.client_exceptions import ClientResponseError
 from homeassistant.const import (
     CONF_BASE,
     CONF_DELAY,
@@ -321,6 +322,40 @@ async def test_invalid_config(
     ):
         await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
     assert "not a file @ data['patch']['files'][0]" in str(err.value)
+
+
+async def test_url_fetch_error(
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """Test URL download error."""
+    aioclient_mock.get("https://test.com/file", status=404)
+    with tempfile.TemporaryDirectory() as dest_dir:
+        destination = Path(dest_dir) / "file"
+        with (destination).open("w", encoding="ascii") as file:
+            file.write("test")
+        await async_setup(hass, {CONF_FILES: []})
+        await async_next_day(hass, freezer)
+        with (
+            patch(
+                "homeassistant.config.load_yaml_config_file",
+                return_value={
+                    DOMAIN: {
+                        CONF_FILES: [
+                            {
+                                CONF_DESTINATION: destination,
+                                CONF_BASE: "https://test.com/file",
+                                CONF_PATCH: "https://test.com/file",
+                            }
+                        ]
+                    }
+                },
+            ),
+            pytest.raises(ClientResponseError) as error,
+        ):
+            await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
+    assert error.value.status == 404
 
 
 async def test_no_delay(
