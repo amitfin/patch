@@ -118,6 +118,9 @@ async def test_delay(
     ],
     ids=["update", "update no restart", "identical", "different base"],
 )
+@pytest.mark.allowed_logs(
+    ["Destination file", "1 core file was patched.", "Restarting HA core."]
+)
 async def test_patch(  # noqa: PLR0913
     async_call_mock: AsyncMock,
     hass: HomeAssistant,
@@ -192,6 +195,9 @@ async def test_patch(  # noqa: PLR0913
     [False, True],
     ids=["name", "full path"],
 )
+@pytest.mark.allowed_logs(
+    ["Destination file", "1 core file was patched.", "Restarting HA core."]
+)
 async def test_patch_url(  # noqa: PLR0913
     async_call_mock: AsyncMock,
     hass: HomeAssistant,
@@ -225,6 +231,9 @@ async def test_patch_url(  # noqa: PLR0913
     assert "1 core file was patched." in caplog.text
 
 
+@pytest.mark.allowed_logs(
+    ["Destination file", "1 core file was patched.", "Restarting HA core."]
+)
 async def test_reload(
     hass: HomeAssistant,
     freezer: FrozenDateTimeFactory,
@@ -365,6 +374,12 @@ async def test_no_delay(
     await async_setup(hass, {CONF_DELAY: 0})
 
 
+@pytest.mark.allowed_logs(
+    [
+        "Invalid config for 'patch'",
+        "Setup failed for custom integration 'patch': Invalid config.",
+    ]
+)
 async def test_negative_delay(
     hass: HomeAssistant,
 ) -> None:
