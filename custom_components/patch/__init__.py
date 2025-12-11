@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import datetime
 import posixpath
-from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, NotRequired, TypedDict
 
@@ -119,14 +118,6 @@ CONFIG_SCHEMA = vol.Schema(
 )
 
 
-class PatchResult(StrEnum):
-    """Patch result types."""
-
-    UPDATED = "updated"
-    IDENTICAL = "identical"
-    BASE_MISMATCH = "base_mismatch"
-
-
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up domain."""
 
@@ -136,13 +127,13 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         if DOMAIN not in config:
             message = f"'{DOMAIN}' section was not found in {YAML_CONFIG_FILE}"
             raise IntegrationError(message)
-        await Patch(hass, CONFIG_SCHEMA({DOMAIN: config[DOMAIN]})[DOMAIN]).run()
+        await PatchManager(hass, CONFIG_SCHEMA({DOMAIN: config[DOMAIN]})[DOMAIN]).run()
 
     hass.services.async_register(DOMAIN, SERVICE_RELOAD, async_reload, vol.Schema({}))
 
     event.async_track_point_in_time(
         hass,
-        Patch(hass, config[DOMAIN]).run_after_migration,
+        PatchManager(hass, config[DOMAIN]).run_after_migration,
         dt_util.now() + datetime.timedelta(seconds=config[DOMAIN][CONF_DELAY]),
     )
 
@@ -150,13 +141,79 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 class Patch:
-    """Patch local files."""
+    """Single patch."""
+
+    def __init__(self, hass: HomeAssistant, config: PatchType) -> None:
+        """Initialize the object."""
+        self._http_client = async_get_clientsession(hass)
+        self.config = config
+
+    async def _read(self, path: Path | URL) -> str:
+        """Read file content."""
+        if isinstance(path, Path):
+            async with aiofiles.open(path) as file:
+                return await file.read()
+        async with self._http_client.get(path) as response:
+            response.raise_for_status()
+            return await response.text()
+
+    async def init(self) -> None:
+        """Get the content of the files."""
+        self._destination, self._base, self._patch = await asyncio.gather(
+            self._read(self.config[CONF_DESTINATION]),
+            self._read(self.config[CONF_BASE]),
+            self._read(self.config[CONF_PATCH]),
+        )
+
+    def _is_base(self) -> bool:
+        """Check if the destination is identical to the base file."""
+        return self._destination == self._base
+
+    def _is_patched(self) -> bool:
+        """Check if the destination is identical to the patch file."""
+        return self._destination == self._patch
+
+    def check(self) -> bool:
+        """Check if patch is needed and then if it's as base."""
+        if not self._is_patched() and not self._is_base():
+            LOGGER.error(
+                "Destination file '%s' is different than its base '%s'.",
+                self.config[CONF_DESTINATION],
+                self.config[CONF_BASE],
+            )
+            return False
+        return True
+
+    async def apply(self) -> bool:
+        """Copy the patch file to the destination."""
+        if self._is_patched():
+            LOGGER.debug(
+                "Destination file '%s' is identical to the patch file '%s'.",
+                self.config[CONF_DESTINATION],
+                self.config[CONF_PATCH],
+            )
+            return False
+
+        async with aiofiles.open(self.config[CONF_DESTINATION], "w") as file:
+            await file.write(self._patch)
+
+        LOGGER.warning(
+            "Destination file '%s' was updated by the patch file '%s'.",
+            self.config[CONF_DESTINATION],
+            self.config[CONF_PATCH],
+        )
+
+        return True
+
+
+class PatchManager:
+    """Patch manager for list of patches."""
 
     def __init__(self, hass: HomeAssistant, config: ConfigType) -> None:
         """Initialize the object."""
         self._hass = hass
         self._config = config
-        self._http_client = async_get_clientsession(hass)
+        self._patches = [Patch(hass, patch) for patch in config.get(CONF_FILES, [])]
 
     @callback
     async def run_after_migration(self, _: datetime.datetime | None = None) -> None:
@@ -173,21 +230,20 @@ class Patch:
 
     async def run(self) -> None:
         """Execute."""
-        if not (patches := self._config.get(CONF_FILES)):
+        if not self._patches:
             return
 
-        await self._get_urls(patches)
-
-        results = await asyncio.gather(*(self._patch(patch) for patch in patches))
+        await asyncio.gather(*(patch.init() for patch in self._patches))
 
         if base_mismatch := [
-            patch
-            for index, patch in enumerate(patches)
-            if results[index] == PatchResult.BASE_MISMATCH
+            patch.config for patch in self._patches if not patch.check()
         ]:
             self._repair(base_mismatch)
+            return
 
-        if (updates := results.count(PatchResult.UPDATED)) > 0:
+        results = await asyncio.gather(*(patch.apply() for patch in self._patches))
+        updates = results.count(True)
+        if updates:
             LOGGER.warning(
                 f"{updates} core file {'s were' if updates > 1 else 'was'} patched."
             )
@@ -197,61 +253,7 @@ class Patch:
                     HA_DOMAIN, SERVICE_HOMEASSISTANT_RESTART
                 )
 
-    async def _get_url(self, url: URL) -> str:
-        """Download a URL."""
-        async with self._http_client.get(url) as response:
-            response.raise_for_status()
-            return await response.text()
-
-    async def _get_urls(self, patches: list[PatchType]) -> None:
-        """Download all URLs and store their content."""
-        urls = list(
-            {url for patch in patches for url in patch.values() if isinstance(url, URL)}
-        )
-        content = await asyncio.gather(*(self._get_url(url) for url in urls))
-        self._url_content = {url: content[index] for index, url in enumerate(urls)}
-
-    async def _read(self, path: Path | URL) -> str:
-        """Read file content."""
-        if isinstance(path, Path):
-            async with aiofiles.open(path) as file:
-                return await file.read()
-        return self._url_content[path]
-
-    async def _patch(self, patch: PatchType) -> PatchResult:
-        """Check if identical files and update the destination if needed."""
-        destination_content, base_content, patch_content = await asyncio.gather(
-            self._read(patch[CONF_DESTINATION]),
-            self._read(patch[CONF_BASE]),
-            self._read(patch[CONF_PATCH]),
-        )
-
-        if destination_content == patch_content:
-            LOGGER.debug(
-                "Destination file '%s' is identical to the patch file '%s'.",
-                patch[CONF_DESTINATION],
-                patch[CONF_PATCH],
-            )
-            return PatchResult.IDENTICAL
-
-        if destination_content != base_content:
-            LOGGER.error(
-                "Destination file '%s' is different than its base '%s'.",
-                patch[CONF_DESTINATION],
-                patch[CONF_BASE],
-            )
-            return PatchResult.BASE_MISMATCH
-
-        async with aiofiles.open(patch[CONF_DESTINATION], "w") as file:
-            await file.write(patch_content)
-        LOGGER.warning(
-            "Destination file '%s' was updated by the patch file '%s'.",
-            patch[CONF_DESTINATION],
-            patch[CONF_PATCH],
-        )
-        return PatchResult.UPDATED
-
-    def _repair(self, files: list[dict[str, str]]) -> None:
+    def _repair(self, files: list[PatchType]) -> None:
         """Report an issue of base file mismatch."""
         file_names = ", ".join(f'"{file[CONF_DESTINATION]}"' for file in files)
         message = (
