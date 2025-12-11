@@ -167,12 +167,13 @@ async def test_patch(  # noqa: PLR0913
                 else destination_content
             )
     assert async_call_mock.call_count == (1 if update and restart else 0)
-    assert len(repairs) == (
-        1 if not update and destination_content != patch_content else 0
-    )
+    assert len(repairs) == (1 if update or destination_content != patch_content else 0)
     if update:
         assert "was updated by the patch file" in caplog.text
         assert "1 core file was patched." in caplog.text
+        assert repairs[0].data["action"] == "create"
+        assert repairs[0].data["domain"] == DOMAIN
+        assert repairs[0].data["issue_id"] == "system_was_patched"
         if restart:
             assert async_call_mock.await_args_list[0].args[0] == ha.DOMAIN
             assert (

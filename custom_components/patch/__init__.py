@@ -242,11 +242,11 @@ class PatchManager:
             return
 
         results = await asyncio.gather(*(patch.apply() for patch in self._patches))
-        updates = results.count(True)
+        updates = [
+            patch.config for index, patch in enumerate(self._patches) if results[index]
+        ]
         if updates:
-            LOGGER.warning(
-                f"{updates} core file {'s were' if updates > 1 else 'was'} patched."
-            )
+            self._applied(updates)
             if self._config[CONF_RESTART]:
                 LOGGER.warning("Restarting HA core.")
                 await self._hass.services.async_call(
@@ -268,9 +268,28 @@ class PatchManager:
             "patch_file_base_mismatch_" + str(int(dt_util.now().timestamp())),
             is_fixable=False,
             learn_more_url="https://github.com/amitfin/patch#configuration",
-            severity=ir.IssueSeverity.WARNING,
+            severity=ir.IssueSeverity.ERROR,
             translation_key="base_mismatch",
             translation_placeholders={
                 "files": message,
+            },
+        )
+
+    def _applied(self, files: list[PatchType]) -> None:
+        """Report the system was patched."""
+        count = len(files)
+        LOGGER.warning(f"{count} core file {'s were' if count > 1 else 'was'} patched.")
+
+        ir.async_create_issue(
+            self._hass,
+            DOMAIN,
+            "system_was_patched",
+            is_fixable=False,
+            is_persistent=True,
+            learn_more_url="https://github.com/amitfin/patch#configuration",
+            severity=ir.IssueSeverity.WARNING,
+            translation_key="system_update",
+            translation_placeholders={
+                "files": ", ".join(f'"{file[CONF_DESTINATION]}"' for file in files),
             },
         )

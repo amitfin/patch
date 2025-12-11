@@ -1,5 +1,9 @@
 {
     "issues": {
+        "system_update": {
+            "title": "Patch Applied",
+            "description": "The following files have been patched: {files}. You may safely dismiss this notice."
+        },
         "base_mismatch": {
             "title": "Patch Base File Mismatch",
             "description": "{files} different than the corresponding base file. To fix this issue rebase the patch, and update the base and patch files."
