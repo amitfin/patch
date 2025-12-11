@@ -71,7 +71,7 @@ Home Assistant can run in different configurations. A common one is Home Assista
 
 It’s possible to explore the environment along with the file system structure and content by:
 
-1. SSH-ing into the host. Instructions are [here](https://developers.home-assistant.io/docs/operating-system/debugging/).
+1. SSH-ing into the host via the [debugging port](https://developers.home-assistant.io/docs/operating-system/debugging/) or [Advanced SSH & Web Terminal](https://github.com/hassio-addons/addon-ssh/blob/main/ssh/DOCS.md) add-on ("Protection mode" must be disabled).
 2. In the SSH session switch into Home Assistant Core’s container via the command: `docker exec -it homeassistant /bin/bash`
 
 ## Reload
