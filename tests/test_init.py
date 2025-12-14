@@ -441,3 +441,22 @@ async def test_wait_for_recorder_migration(
     async_migration_in_progress_mock.return_value = False
     await async_next_day(hass, freezer)
     assert _delay_count(caplog.text) == i
+
+
+@pytest.mark.allowed_logs(["Destination file"])
+async def test_immediate_base_mismatch(hass: HomeAssistant) -> None:
+    """Test base mismatch is reported during integration setup."""
+    repairs = async_capture_events(hass, ir.EVENT_REPAIRS_ISSUE_REGISTRY_UPDATED)
+    await async_setup(
+        hass,
+        yaml.load(
+            """
+            files:
+              - destination: "{homeassistant}/__init__.py"
+                base: "{homeassistant}/__main__.py"
+                patch: "{homeassistant}/py.typed"
+            """,
+            Loader=yaml.SafeLoader,
+        ),
+    )
+    assert repairs[0].data["issue_id"].startswith("patch_file_base_mismatch")

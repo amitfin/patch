@@ -131,11 +131,13 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     hass.services.async_register(DOMAIN, SERVICE_RELOAD, async_reload, vol.Schema({}))
 
-    event.async_track_point_in_time(
-        hass,
-        PatchManager(hass, config[DOMAIN]).run_after_migration,
-        dt_util.now() + datetime.timedelta(seconds=config[DOMAIN][CONF_DELAY]),
-    )
+    patch_manager = PatchManager(hass, config[DOMAIN])
+    if await patch_manager.init():
+        event.async_track_point_in_time(
+            hass,
+            patch_manager.apply_after_migration,
+            dt_util.now() + datetime.timedelta(seconds=config[DOMAIN][CONF_DELAY]),
+        )
 
     return True
 
@@ -157,13 +159,14 @@ class Patch:
             response.raise_for_status()
             return await response.text()
 
-    async def init(self) -> None:
+    async def init(self) -> bool:
         """Get the content of the files."""
         self._destination, self._base, self._patch = await asyncio.gather(
             self._read(self.config[CONF_DESTINATION]),
             self._read(self.config[CONF_BASE]),
             self._read(self.config[CONF_PATCH]),
         )
+        return self._check()
 
     def _is_base(self) -> bool:
         """Check if the destination is identical to the base file."""
@@ -173,7 +176,7 @@ class Patch:
         """Check if the destination is identical to the patch file."""
         return self._destination == self._patch
 
-    def check(self) -> bool:
+    def _check(self) -> bool:
         """Check if patch is needed and then if it's as base."""
         if not self._is_patched() and not self._is_base():
             LOGGER.error(
@@ -216,42 +219,47 @@ class PatchManager:
         self._patches = [Patch(hass, patch) for patch in config.get(CONF_FILES, [])]
 
     @callback
-    async def run_after_migration(self, _: datetime.datetime | None = None) -> None:
-        """Run if there is no migration in progress."""
+    async def apply_after_migration(self, _: datetime.datetime | None = None) -> None:
+        """Apply patches if there is no DB migration in progress."""
         if recorder.async_migration_in_progress(self._hass):
             LOGGER.info("Recorder migration in progress. Checking again in a minute.")
             event.async_track_point_in_time(
                 self._hass,
-                self.run_after_migration,
+                self.apply_after_migration,
                 dt_util.now() + datetime.timedelta(minutes=1),
             )
         else:
             await self.run()
 
-    async def run(self) -> None:
-        """Execute."""
-        if not self._patches:
-            return
-
-        await asyncio.gather(*(patch.init() for patch in self._patches))
-
+    async def init(self) -> bool:
+        """Initialize all patches."""
+        results = await asyncio.gather(*(patch.init() for patch in self._patches))
         if base_mismatch := [
-            patch.config for patch in self._patches if not patch.check()
+            patch.config
+            for index, patch in enumerate(self._patches)
+            if not results[index]
         ]:
             self._repair(base_mismatch)
-            return
+            return False
+        return True
 
+    async def _apply(self) -> None:
+        """Execute."""
         results = await asyncio.gather(*(patch.apply() for patch in self._patches))
-        updates = [
+        if updates := [
             patch.config for index, patch in enumerate(self._patches) if results[index]
-        ]
-        if updates:
+        ]:
             self._applied(updates)
             if self._config[CONF_RESTART]:
                 LOGGER.warning("Restarting HA core.")
                 await self._hass.services.async_call(
                     HA_DOMAIN, SERVICE_HOMEASSISTANT_RESTART
                 )
+
+    async def run(self) -> None:
+        """Run the patching process."""
+        if await self.init():
+            await self._apply()
 
     def _format_files(self, files: list[PatchType]) -> str:
         """Format list of files for logging."""
