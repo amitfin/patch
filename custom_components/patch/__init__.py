@@ -253,15 +253,12 @@ class PatchManager:
                     HA_DOMAIN, SERVICE_HOMEASSISTANT_RESTART
                 )
 
+    def _format_files(self, files: list[PatchType]) -> str:
+        """Format list of files for logging."""
+        return f"- {'\n- '.join(f'`{file[CONF_DESTINATION]}`' for file in files)}"
+
     def _repair(self, files: list[PatchType]) -> None:
         """Report an issue of base file mismatch."""
-        file_names = ", ".join(f'"{file[CONF_DESTINATION]}"' for file in files)
-        message = (
-            f"The file {file_names} is"
-            if len(files) == 1
-            else f"The files {file_names} are"
-        )
-
         ir.async_create_issue(
             self._hass,
             DOMAIN,
@@ -270,16 +267,11 @@ class PatchManager:
             learn_more_url="https://github.com/amitfin/patch#configuration",
             severity=ir.IssueSeverity.ERROR,
             translation_key="base_mismatch",
-            translation_placeholders={
-                "files": message,
-            },
+            translation_placeholders={"files": self._format_files(files)},
         )
 
     def _applied(self, files: list[PatchType]) -> None:
         """Report the system was patched."""
-        count = len(files)
-        LOGGER.warning(f"{count} core file {'s were' if count > 1 else 'was'} patched.")
-
         ir.async_create_issue(
             self._hass,
             DOMAIN,
@@ -289,7 +281,5 @@ class PatchManager:
             learn_more_url="https://github.com/amitfin/patch#configuration",
             severity=ir.IssueSeverity.WARNING,
             translation_key="system_update",
-            translation_placeholders={
-                "files": ", ".join(f'"{file[CONF_DESTINATION]}"' for file in files),
-            },
+            translation_placeholders={"files": self._format_files(files)},
         )

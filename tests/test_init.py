@@ -169,8 +169,6 @@ async def test_patch(  # noqa: PLR0913
     assert async_call_mock.call_count == (1 if update and restart else 0)
     assert len(repairs) == (1 if update or destination_content != patch_content else 0)
     if update:
-        assert "was updated by the patch file" in caplog.text
-        assert "1 core file was patched." in caplog.text
         assert repairs[0].data["action"] == "create"
         assert repairs[0].data["domain"] == DOMAIN
         assert repairs[0].data["issue_id"] == "system_was_patched"
@@ -199,15 +197,15 @@ async def test_patch(  # noqa: PLR0913
 @pytest.mark.allowed_logs(
     ["Destination file", "1 core file was patched.", "Restarting HA core."]
 )
-async def test_patch_url(  # noqa: PLR0913
+async def test_patch_url(
     async_call_mock: AsyncMock,
     hass: HomeAssistant,
     aioclient_mock: AiohttpClientMocker,
     freezer: FrozenDateTimeFactory,
-    caplog: pytest.LogCaptureFixture,
     full_path: bool,  # noqa: FBT001
 ) -> None:
     """Test updating a file using URLs."""
+    repairs = async_capture_events(hass, ir.EVENT_REPAIRS_ISSUE_REGISTRY_UPDATED)
     aioclient_mock.get("https://test.com/base/file", text="old")
     aioclient_mock.get("https://test.com/patch/file", text="new")
     with tempfile.TemporaryDirectory() as destination:
@@ -228,8 +226,7 @@ async def test_patch_url(  # noqa: PLR0913
         with (Path(destination) / "file").open(encoding="ascii") as file:
             assert file.read() == "new"
     assert async_call_mock.call_count == 1
-    assert "was updated by the patch file" in caplog.text
-    assert "1 core file was patched." in caplog.text
+    assert repairs[0].data["issue_id"] == "system_was_patched"
 
 
 @pytest.mark.allowed_logs(
