@@ -263,7 +263,7 @@ class PatchManager:
 
     def _format_files(self, files: list[PatchType]) -> str:
         """Format list of files for logging."""
-        return f"- {'\n- '.join(f'`{file[CONF_DESTINATION]}`' for file in files)}"
+        return f"- {'\n- '.join(f'`{file[CONF_DESTINATION]}`' for file in files)}\n"
 
     def _repair(self, files: list[PatchType]) -> None:
         """Report an issue of base file mismatch."""
