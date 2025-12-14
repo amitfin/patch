@@ -267,15 +267,12 @@ class PatchManager:
 
     def _repair(self, files: list[PatchType]) -> None:
         """Report an issue of base file mismatch."""
-        ir.async_delete_issue(
-            self._hass,
-            DOMAIN,
-            "patch_file_base_mismatch",
-        )
+        issue_id = "patch_file_base_mismatch"
+        ir.async_delete_issue(self._hass, DOMAIN, issue_id)
         ir.async_create_issue(
             self._hass,
             DOMAIN,
-            "patch_file_base_mismatch",
+            issue_id,
             is_fixable=False,
             learn_more_url="https://github.com/amitfin/patch#configuration",
             severity=ir.IssueSeverity.ERROR,
@@ -285,15 +282,12 @@ class PatchManager:
 
     def _applied(self, files: list[PatchType]) -> None:
         """Report the system was patched."""
-        ir.async_delete_issue(
-            self._hass,
-            DOMAIN,
-            "system_was_patched",
-        )
+        issue_id = "system_was_patched"
+        ir.async_delete_issue(self._hass, DOMAIN, issue_id)
         ir.async_create_issue(
             self._hass,
             DOMAIN,
-            "system_was_patched",
+            issue_id,
             is_fixable=False,
             is_persistent=True,
             learn_more_url="https://github.com/amitfin/patch#configuration",
