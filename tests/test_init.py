@@ -171,7 +171,7 @@ async def test_patch(  # noqa: PLR0913
     if update:
         assert repairs[0].data["action"] == "create"
         assert repairs[0].data["domain"] == DOMAIN
-        assert repairs[0].data["issue_id"] == "system_was_patched"
+        assert repairs[0].data["issue_id"].startswith("system_was_patched")
         if restart:
             assert async_call_mock.await_args_list[0].args[0] == ha.DOMAIN
             assert (
@@ -226,7 +226,7 @@ async def test_patch_url(
         with (Path(destination) / "file").open(encoding="ascii") as file:
             assert file.read() == "new"
     assert async_call_mock.call_count == 1
-    assert repairs[0].data["issue_id"] == "system_was_patched"
+    assert repairs[0].data["issue_id"].startswith("system_was_patched")
 
 
 @pytest.mark.allowed_logs(

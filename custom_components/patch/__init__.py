@@ -283,7 +283,7 @@ class PatchManager:
         ir.async_create_issue(
             self._hass,
             DOMAIN,
-            "system_was_patched",
+            "system_was_patched_" + str(int(dt_util.now().timestamp())),
             is_fixable=False,
             is_persistent=True,
             learn_more_url="https://github.com/amitfin/patch#configuration",
