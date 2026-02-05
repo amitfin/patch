@@ -159,13 +159,28 @@ class Patch:
             response.raise_for_status()
             return await response.text()
 
-    async def init(self) -> bool:
+    async def init(self) -> bool | list[tuple[str, Exception]]:
         """Get the content of the files."""
         self._destination, self._base, self._patch = await asyncio.gather(
             self._read(self.config[CONF_DESTINATION]),
             self._read(self.config[CONF_BASE]),
             self._read(self.config[CONF_PATCH]),
+            return_exceptions=True,
         )
+        if errors := [
+            (str(name), content)
+            for name, content in zip(
+                [
+                    self.config[CONF_DESTINATION],
+                    self.config[CONF_BASE],
+                    self.config[CONF_PATCH],
+                ],
+                [self._destination, self._base, self._patch],
+                strict=True,
+            )
+            if isinstance(content, Exception)
+        ]:
+            return errors
         return self._check()
 
     def _is_base(self) -> bool:
@@ -198,7 +213,7 @@ class Patch:
             return False
 
         async with aiofiles.open(self.config[CONF_DESTINATION], "w") as file:
-            await file.write(self._patch)
+            await file.write(str(self._patch))
 
         LOGGER.warning(
             "Destination file '%s' was updated by the patch file '%s'.",
@@ -233,7 +248,14 @@ class PatchManager:
 
     async def init(self) -> bool:
         """Initialize all patches."""
-        results = await asyncio.gather(*(patch.init() for patch in self._patches))
+        results = await asyncio.gather(
+            *(patch.init() for patch in self._patches), return_exceptions=True
+        )
+        if errors := [
+            error for result in results if isinstance(result, list) for error in result
+        ]:
+            self._error(errors)
+            return False
         if base_mismatch := [
             patch.config
             for index, patch in enumerate(self._patches)
@@ -294,4 +316,23 @@ class PatchManager:
             severity=ir.IssueSeverity.WARNING,
             translation_key="system_update",
             translation_placeholders={"files": self._format_files(files)},
+        )
+
+    def _error(self, files: list[tuple[str, Exception]]) -> None:
+        """Report failures of reading files."""
+        issue_id = "patch_file_read_error"
+        ir.async_delete_issue(self._hass, DOMAIN, issue_id)
+        ir.async_create_issue(
+            self._hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=False,
+            learn_more_url="https://github.com/amitfin/patch#configuration",
+            severity=ir.IssueSeverity.ERROR,
+            translation_key="read_error",
+            translation_placeholders={
+                "files": (
+                    f"- {'\n- '.join(f'`{name}` ({error})' for name, error in files)}\n"
+                )
+            },
         )

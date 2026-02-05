@@ -15,7 +15,6 @@ import pytest
 import voluptuous as vol
 import voluptuous.error as vol_error
 import yaml
-from aiohttp.client_exceptions import ClientResponseError
 from homeassistant.const import (
     CONF_BASE,
     CONF_DELAY,
@@ -337,32 +336,39 @@ async def test_url_fetch_error(
     aioclient_mock: AiohttpClientMocker,
 ) -> None:
     """Test URL download error."""
-    aioclient_mock.get("https://test.com/file", status=404)
+    repairs = async_capture_events(hass, ir.EVENT_REPAIRS_ISSUE_REGISTRY_UPDATED)
+    aioclient_mock.get("https://test.com/base", status=404)
+    aioclient_mock.get("https://test.com/patch", status=500)
     with tempfile.TemporaryDirectory() as dest_dir:
         destination = Path(dest_dir) / "file"
         with (destination).open("w", encoding="ascii") as file:
             file.write("test")
         await async_setup(hass, {CONF_FILES: []})
         await async_next_day(hass, freezer)
-        with (
-            patch(
-                "homeassistant.config.load_yaml_config_file",
-                return_value={
-                    DOMAIN: {
-                        CONF_FILES: [
-                            {
-                                CONF_DESTINATION: destination,
-                                CONF_BASE: "https://test.com/file",
-                                CONF_PATCH: "https://test.com/file",
-                            }
-                        ]
-                    }
-                },
-            ),
-            pytest.raises(ClientResponseError) as error,
+        with patch(
+            "homeassistant.config.load_yaml_config_file",
+            return_value={
+                DOMAIN: {
+                    CONF_FILES: [
+                        {
+                            CONF_DESTINATION: destination,
+                            CONF_BASE: "https://test.com/base",
+                            CONF_PATCH: "https://test.com/patch",
+                        }
+                    ]
+                }
+            },
         ):
             await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
-    assert error.value.status == 404
+    assert repairs[0].data["issue_id"] == "patch_file_read_error"
+    repair = ir.async_get(hass).async_get_issue(DOMAIN, "patch_file_read_error")
+    assert repair is not None
+    assert repair.translation_placeholders == {
+        "files": (
+            "- `https://test.com/base` (404, message='', url='http://example.com')\n"
+            "- `https://test.com/patch` (500, message='', url='http://example.com')\n"
+        )
+    }
 
 
 async def test_no_delay(

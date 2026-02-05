@@ -7,6 +7,10 @@
         "base_mismatch": {
             "title": "Patch Base File Mismatch",
             "description": "The following files are different than their base file:\n{files}\nTo fix this issue rebase the patch, and update the base and patch files."
+        },
+        "read_error": {
+            "title": "Error Reading Patch Files",
+            "description": "The following files could not be read:\n{files}\nTo fix this issue, ensure the files are accessible and readable."
         }
     }
 }
