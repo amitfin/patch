@@ -159,15 +159,15 @@ class Patch:
             response.raise_for_status()
             return await response.text()
 
-    async def init(self) -> bool | list[tuple[str, Exception]]:
-        """Get the content of the files."""
+    async def load(self) -> list[tuple[str, Exception]]:
+        """Read the content of the files and return any errors."""
         self._destination, self._base, self._patch = await asyncio.gather(
             self._read(self.config[CONF_DESTINATION]),
             self._read(self.config[CONF_BASE]),
             self._read(self.config[CONF_PATCH]),
             return_exceptions=True,
         )
-        if errors := [
+        return [
             (str(name), content)
             for name, content in zip(
                 [
@@ -179,9 +179,7 @@ class Patch:
                 strict=True,
             )
             if isinstance(content, Exception)
-        ]:
-            return errors
-        return self._check()
+        ]
 
     def _is_base(self) -> bool:
         """Check if the destination is identical to the base file."""
@@ -191,7 +189,7 @@ class Patch:
         """Check if the destination is identical to the patch file."""
         return self._destination == self._patch
 
-    def _check(self) -> bool:
+    def check(self) -> bool:
         """Check if patch is needed and then if it's as base."""
         if not self._is_patched() and not self._is_base():
             LOGGER.error(
@@ -248,18 +246,17 @@ class PatchManager:
 
     async def init(self) -> bool:
         """Initialize all patches."""
-        results = await asyncio.gather(
-            *(patch.init() for patch in self._patches), return_exceptions=True
-        )
         if errors := [
-            error for result in results if isinstance(result, list) for error in result
+            error
+            for result in (
+                await asyncio.gather(*(patch.load() for patch in self._patches))
+            )
+            for error in result
         ]:
             self._error(errors)
             return False
         if base_mismatch := [
-            patch.config
-            for index, patch in enumerate(self._patches)
-            if not results[index]
+            patch.config for patch in self._patches if not patch.check()
         ]:
             self._repair(base_mismatch)
             return False
