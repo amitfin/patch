@@ -19,6 +19,7 @@
     "levelname",
     "levelno",
     "mypy",
+    "prek",
     "pycoolmasternet",
     "pysiaalarm",
     "pytest",
