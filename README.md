@@ -41,16 +41,11 @@ patch:
 `files` is a list of patches to apply. Each item on the list has the following properties:
 
 - `name`: an optional file name. If it exists, it gets appended to the rest of the properties. If it doesn't exist, the rest of the properties should be supplied as a full path, including the file name.
-- `destination`: the local path to the file which should get the patch.
+- `destination`: the local path to the file which should be patched. The following variables can be used as a prefix: `{site-packages}` as the path to the location of Python libraries (e.g. `/usr/local/lib/python3.14/site-packages`), or `{homeassistant}` as the path to the `homeassistant` directory, i.e. `/usr/src/homeassistant/homeassistant` (the 2nd `/homeassistant` is not a mistake. There is `homeassistant` directory under the root.)
 - `base`: the path to the original file (before the patch). The patch happens only if the content of the file to be patched (`destination`) is identical to the content of the base file. Otherwise, a repair issue is raised. In such a case, a rebase of the patch is required along with updating the content of the files `base` and `patch`. This parameter can be provided as a local path or as a URL.
 - `patch`: the path to the file with the change. It can be provided as a local path or as a URL.
 
-All files must exist inside the Home Assistant Core environment. It’s convenient to point `base` and `patch` to [network shares](https://www.home-assistant.io/common-tasks/os#network-storage), or provide them as URLs.
-
-The `destination` path can use the following variables as a prefix:
-
-1. `site-packages`: path to the location of Python libraries (e.g. `/usr/local/lib/python3.14/site-packages`).
-2. `homeassistant`: path to the `homeassistant` directory, i.e. `/usr/src/homeassistant/homeassistant` (the 2nd `/homeassistant` is not a mistake. There is `homeassistant` directory under the root.)
+All files must be accessible from the Home Assistant Core environment. It’s convenient to point `base` and `patch` to [network shares](https://www.home-assistant.io/common-tasks/os#network-storage), or provide them as URLs.
 
 ## Install
 
@@ -60,7 +55,7 @@ HACS is the preferred and easier way to install the component, and can be done b
 
 Otherwise, download `patch.zip` from the [latest release](https://github.com/amitfin/patch/releases), extract and copy the content under `custom_components` directory.
 
-Home Assistant restart is required once the integration files are copied (either by HACS or manually). After the restart, the `configuration.yaml` should be edited and the `patch` section should be created. An additional restart is required after that for the integration to be loaded.
+Once the integration files are copied (either by HACS or manually) the `configuration.yaml` should be edited and the `patch` section should be created. A restart is required after that for the integration to be loaded.
 
 ## File System structure
 
@@ -71,7 +66,7 @@ Home Assistant can run in different configurations. A common one is Home Assista
 
 It’s possible to explore the environment along with the file system structure and content by:
 
-1. SSH-ing into the host via the [debugging port](https://developers.home-assistant.io/docs/operating-system/debugging/) or [Advanced SSH & Web Terminal](https://github.com/hassio-addons/addon-ssh/blob/main/ssh/DOCS.md) add-on ("Protection mode" must be disabled).
+1. SSH-ing into the host via the [debugging port](https://developers.home-assistant.io/docs/operating-system/debugging/) or [Advanced SSH & Web Terminal](https://github.com/hassio-addons/addon-ssh/blob/main/ssh/DOCS.md) add-on (`Protection mode` must be disabled).
 2. In the SSH session switch into Home Assistant Core’s container via the command: `docker exec -it homeassistant /bin/bash`
 
 ## Reload
