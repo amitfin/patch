@@ -6,7 +6,7 @@ import asyncio
 import datetime
 import posixpath
 from pathlib import Path
-from typing import TYPE_CHECKING, NotRequired, TypedDict
+from typing import TYPE_CHECKING, NotRequired, TypedDict, cast
 
 import aiofiles
 import homeassistant
@@ -127,7 +127,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         if DOMAIN not in config:
             message = f"'{DOMAIN}' section was not found in {YAML_CONFIG_FILE}"
             raise IntegrationError(message)
-        await PatchManager(hass, CONFIG_SCHEMA({DOMAIN: config[DOMAIN]})[DOMAIN]).run()
+        validated_config = cast("ConfigType", CONFIG_SCHEMA({DOMAIN: config[DOMAIN]}))
+        await PatchManager(hass, validated_config[DOMAIN]).run()
 
     hass.services.async_register(DOMAIN, SERVICE_RELOAD, async_reload, vol.Schema({}))
 

@@ -120,7 +120,7 @@ async def test_delay(
 @pytest.mark.allowed_logs(
     ["Destination file", "1 core file was patched.", "Restarting HA core."]
 )
-async def test_patch(  # noqa: PLR0913
+async def test_patch(  # noqa: PLR0913,PLR0917
     async_call_mock: AsyncMock,
     hass: HomeAssistant,
     freezer: FrozenDateTimeFactory,
