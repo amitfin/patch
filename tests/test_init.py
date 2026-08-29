@@ -327,7 +327,7 @@ async def test_invalid_config(
         pytest.raises(vol_error.MultipleInvalid) as err,
     ):
         await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
-    assert "not a file @ data['patch']['files'][0]" in str(err.value)
+    assert "not a file at 'patch.files[0]'" in str(err.value)
 
 
 async def test_url_fetch_error(
