@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-import datetime
+import datetime as dt
 import posixpath
 from pathlib import Path
 from typing import TYPE_CHECKING, NotRequired, TypedDict, cast
@@ -130,14 +130,21 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         validated_config = cast("ConfigType", CONFIG_SCHEMA({DOMAIN: config[DOMAIN]}))
         await PatchManager(hass, validated_config[DOMAIN]).run()
 
-    hass.services.async_register(DOMAIN, SERVICE_RELOAD, async_reload, vol.Schema({}))
+    # HA 2026.11 annotates the schema as probatio.Schema (voluptuous is its shim at
+    # runtime). The minimum version predates probatio, so keep vol.Schema.
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_RELOAD,
+        async_reload,
+        vol.Schema({}),  # type: ignore[arg-type, unused-ignore]
+    )
 
     patch_manager = PatchManager(hass, config[DOMAIN])
     if await patch_manager.init():
         event.async_track_point_in_time(
             hass,
             patch_manager.apply_after_migration,
-            dt_util.now() + datetime.timedelta(seconds=config[DOMAIN][CONF_DELAY]),
+            dt_util.now() + dt.timedelta(seconds=config[DOMAIN][CONF_DELAY]),
         )
 
     return True
@@ -233,14 +240,14 @@ class PatchManager:
         self._patches = [Patch(hass, patch) for patch in config.get(CONF_FILES, [])]
 
     @callback
-    async def apply_after_migration(self, _: datetime.datetime | None = None) -> None:
+    async def apply_after_migration(self, _: dt.datetime | None = None) -> None:
         """Apply patches if there is no DB migration in progress."""
         if recorder.async_migration_in_progress(self._hass):
             LOGGER.info("Recorder migration in progress. Checking again in a minute.")
             event.async_track_point_in_time(
                 self._hass,
                 self.apply_after_migration,
-                dt_util.now() + datetime.timedelta(minutes=1),
+                dt_util.now() + dt.timedelta(minutes=1),
             )
         else:
             await self.run()

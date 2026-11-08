@@ -16,14 +16,17 @@
     "hass",
     "homeassistant",
     "hookwrapper",
+    "httpx",
     "levelname",
     "levelno",
     "mypy",
     "prek",
+    "probatio",
     "pycoolmasternet",
     "pysiaalarm",
     "pytest",
     "PYTHONPATH",
+    "respx",
     "venv"
   ]
 }
