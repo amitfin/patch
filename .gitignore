@@ -16,3 +16,6 @@ coverage.xml
 config/*
 !config/configuration.yaml
 !config/patch.yaml
+
+# Config directory of the hass fixture (pytest-homeassistant), e.g. default blueprints
+tests/testing_config

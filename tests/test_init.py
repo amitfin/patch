@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import datetime
+import datetime as dt
 import os
 import tempfile
 from pathlib import Path
@@ -25,7 +25,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import IntegrationError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.setup import async_setup_component
-from pytest_homeassistant_custom_component.common import (
+from pytest_homeassistant.common import (
     async_capture_events,
     async_fire_time_changed,
 )
@@ -44,7 +44,7 @@ from custom_components.patch.const import (
 if TYPE_CHECKING:
     from freezegun.api import FrozenDateTimeFactory
     from homeassistant.helpers.typing import ConfigType
-    from pytest_homeassistant_custom_component.test_util.aiohttp import (
+    from pytest_homeassistant.test_util.aiohttp import (
         AiohttpClientMocker,
     )
 
@@ -63,7 +63,7 @@ async def async_next_minutes(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory, minutes: float = 1
 ) -> None:
     """Jump to the next minutes and execute all pending timers."""
-    freezer.move_to(dt_util.now() + datetime.timedelta(minutes=minutes))
+    freezer.move_to(dt_util.now() + dt.timedelta(minutes=minutes))
     async_fire_time_changed(hass)
     await hass.async_block_till_done(wait_background_tasks=True)
 
@@ -95,14 +95,14 @@ async def test_delay(
     expected_delay: int,
 ) -> None:
     """Test empty configuration."""
-    now = datetime.datetime.fromisoformat("2000-01-01")
+    now = dt.datetime.fromisoformat("2000-01-01")
     freezer.move_to(now)
     await async_setup(hass, {CONF_DELAY: delay} if delay is not None else None)
     await async_next_day(hass, freezer)
     assert async_track_point_in_time_mock.call_count == 1
     assert (
         async_track_point_in_time_mock.call_args[0][2].timestamp()
-        == (now + datetime.timedelta(seconds=expected_delay)).timestamp()
+        == (now + dt.timedelta(seconds=expected_delay)).timestamp()
     )
 
 
