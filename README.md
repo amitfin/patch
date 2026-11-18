@@ -1,6 +1,6 @@
 # Patch
 
-[![HACS Badge](https://img.shields.io/badge/HACS-Default-31A9F4.svg?style=for-the-badge)](https://github.com/hacs/integration)
+[![Marketplace Badge](https://img.shields.io/badge/Marketplace-Default-31A9F4.svg?style=for-the-badge)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=amitfin&repository=patch&category=integration)
 
 [![GitHub Release](https://img.shields.io/github/release/amitfin/patch.svg?style=for-the-badge&color=blue)](https://github.com/amitfin/patch/releases)
 
@@ -49,13 +49,11 @@ All files must be accessible from the Home Assistant Core environment. It’s co
 
 ## Install
 
-HACS is the preferred and easier way to install the component, and can be done by using this My button:
+Install the integration from the **Marketplace** (**Settings** > **Marketplace**) by using this My button:
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=amitfin&repository=patch&category=integration)
+[![Open your Home Assistant instance and open a repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=amitfin&repository=patch&category=integration)
 
-Otherwise, download `patch.zip` from the [latest release](https://github.com/amitfin/patch/releases), extract and copy the content under `custom_components` directory.
-
-Once the integration files are copied (either by HACS or manually) the `configuration.yaml` should be edited and the `patch` section should be created. A restart is required after that for the integration to be loaded.
+Once the integration is installed, the `configuration.yaml` should be edited and the `patch` section should be created. A restart is required after that for the integration to be loaded.
 
 ## File System structure
 
@@ -82,9 +80,8 @@ It's not possible to re-patch a file by simply updating the content of `patch`. 
 1. **Delete the configuration:**
    - Delete the `patch:` section from `configuration.yaml`.
 
-2. **Remove the integration files:**
-   - If the integration was installed via **HACS**, follow the [official HACS removal instructions](https://www.hacs.xyz/docs/use/repositories/dashboard/#removing-a-repository).
-   - Otherwise, manually delete the integration’s folder `custom_components/patch`.
+2. **Uninstall the integration:**
+   - Open **Settings** > **Marketplace**, select the **Installed** tab, and uninstall it.
 
 📌 A **Home Assistant core restart** is required to fully apply the removal.
 
